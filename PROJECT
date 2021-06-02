@@ -1,0 +1,7 @@
+domain: harvesterci.io
+repo: github.com/ibrokethecloud/harvester-tink-operator
+resources:
+- group: node
+  kind: Register
+  version: v1alpha1
+version: "2"

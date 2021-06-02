@@ -1,0 +1,24 @@
+# permissions for end users to edit registers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: register-editor-role
+rules:
+- apiGroups:
+  - node.harvesterci.io
+  resources:
+  - registers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - node.harvesterci.io
+  resources:
+  - registers/status
+  verbs:
+  - get

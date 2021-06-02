@@ -1,0 +1,20 @@
+# permissions for end users to view registers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: register-viewer-role
+rules:
+- apiGroups:
+  - node.harvesterci.io
+  resources:
+  - registers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - node.harvesterci.io
+  resources:
+  - registers/status
+  verbs:
+  - get
