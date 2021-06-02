@@ -19,9 +19,14 @@ package main
 import (
 	"flag"
 	"os"
+	"sync"
 
+	web "net/http"
+
+	"github.com/gorilla/mux"
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
 	"github.com/ibrokethecloud/harvester-tink-operator/controllers"
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/http"
 	"github.com/ibrokethecloud/harvester-tink-operator/pkg/tink"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -57,6 +62,7 @@ func main() {
 
 	config := ctrl.GetConfigOrDie()
 
+	// Need to check CM exists //
 	nonMgrClient, err := client.New(config, client.Options{})
 
 	if err != nil {
@@ -91,6 +97,25 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Register")
 		os.Exit(1)
 	}
+
+	// api server to serve config objects
+	router := mux.NewRouter()
+	configServer := http.ConfigServer{
+		Client: client,
+		Log:    ctrl.Log.WithName("webserver").WithName("config"),
+	}
+	configServer.SetupRoutes(router)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = web.ListenAndServe(":"+nodev1alpha1.DefaultConfigURLPort, router)
+		if err != nil {
+			os.Exit(1)
+		}
+	}()
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
@@ -98,4 +123,6 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
+	wg.Wait()
 }

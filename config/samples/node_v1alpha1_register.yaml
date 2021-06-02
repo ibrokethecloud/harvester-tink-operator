@@ -7,3 +7,4 @@ spec:
   macAddress: "0c:c4:7a:6b:80:d0"
   token: token
   interface: eth0
+  isourl: http://172.16.132.186:8080/harvester.iso

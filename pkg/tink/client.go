@@ -18,16 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	configMapName        = "tinkconfig"
-	configMapNamespace   = "harvester-operator"
-	DefaultConfigURLPort = "30880"
-)
-
 func NewClient(apiClient client.Client) (fullClient *hw.FullClient, err error) {
 	var certURL, grpcAuth string
 	cm := &corev1.ConfigMap{}
-	err = apiClient.Get(context.Background(), types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, cm)
+	err = apiClient.Get(context.Background(), types.NamespacedName{Name: nodev1alpha1.ConfigMapName, Namespace: nodev1alpha1.ConfigMapNamespace}, cm)
 	if err != nil {
 		return nil, errors.Wrap(err, "error during configMap get")
 	}
@@ -93,7 +87,7 @@ func GenerateHWRequest(regoReq *nodev1alpha1.Register, serverURL string) (hw *ha
 	urlArr := strings.Split(url.Host, ":")
 
 	// url for fetching config data for new node //
-	configUrl := fmt.Sprintf("http://%s:%s/%s", urlArr[0], DefaultConfigURLPort, regoReq.Status.UUID)
+	configUrl := fmt.Sprintf("http://%s:%s/config/%s", urlArr[0], nodev1alpha1.DefaultConfigURLPort, regoReq.Status.UUID)
 
 	userData := fmt.Sprintf("harvester.install.config_url=%s", configUrl)
 	m := nodev1alpha1.MetaData{

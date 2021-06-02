@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	installer "github.com/ibrokethecloud/harvester-tink-operator/pkg/installer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,14 +26,22 @@ import (
 
 // RegisterSpec defines the desired state of Register
 type RegisterSpec struct {
-	MacAddress  string   `json:"macAddress"`
-	Token       string   `json:"token"`
-	Nameservers []string `json:"nameServers,omitempty"`
-	Interface   string   `json:"interface"`
-	Address     string   `json:"address,omitempty"`
-	Netmask     string   `json:"netmask,omitempty"`
-	Gateway     string   `json:"gateway,omitempty"`
-	IsoURL      string   `json:"isourl,omitempty"`
+	MacAddress        string            `json:"macAddress"`
+	Token             string            `json:"token"`
+	Nameservers       []string          `json:"nameServers,omitempty"`
+	Interface         string            `json:"interface"`
+	Address           string            `json:"address,omitempty"`
+	Netmask           string            `json:"netmask,omitempty"`
+	Gateway           string            `json:"gateway,omitempty"`
+	IsoURL            string            `json:"isourl"`
+	SSHAuthorizedKeys []string          `json:"sshAuthorizedKeys,omitempty"`
+	Modules           []string          `json:"modules,omitempty"`
+	Sysctls           map[string]string `json:"sysctls,omitempty"`
+	NTPServers        []string          `json:"ntpServers,omitempty"`
+	DNSNameservers    []string          `json:"dnsNameservers,omitempty"`
+	Wifi              []installer.Wifi  `json:"wifi,omitempty"`
+	Password          string            `json:"password,omitempty"`
+	Environment       map[string]string `json:"environment,omitempty"`
 }
 
 // RegisterStatus defines the observed state of Register

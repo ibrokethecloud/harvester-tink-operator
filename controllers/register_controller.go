@@ -19,12 +19,12 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/tinkerbell/tink/protos/hardware"
 
 	"github.com/ibrokethecloud/harvester-tink-operator/pkg/tink"
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/util"
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
@@ -32,9 +32,7 @@ import (
 	"github.com/pkg/errors"
 	hw "github.com/tinkerbell/tink/client"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -143,6 +141,7 @@ func (r *RegisterReconciler) generateUID(regoReq *nodev1alpha1.Register) (regoSt
 
 	uuid := uuid.New().String()
 	labels["uuid"] = uuid
+	regoReq.Labels = labels
 	regoStatus.UUID = uuid
 	regoStatus.Status = UIDGenerated
 	return regoStatus, nil
@@ -153,25 +152,12 @@ func (r *RegisterReconciler) generateHardware(ctx context.Context, regoReq *node
 
 	regoStatus = regoReq.Status.DeepCopy()
 
-	serverURL := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "harvesterhci.io/v1beta1",
-			"kind":       "Setting",
-		},
-	}
-
-	err = r.Get(context.TODO(), types.NamespacedName{Name: "server-url", Namespace: ""}, serverURL)
-
+	regoURL, err := util.FetchServerURL(r.Client)
 	if err != nil {
-		return regoStatus, errors.Wrap(err, "error fetching server-url")
+		return regoStatus, errors.Wrap(err, "error fetching server url")
 	}
 
-	regoURL, ok := serverURL.Object["value"]
-	if !ok {
-		return regoStatus, fmt.Errorf("server-url value is not set")
-	}
-
-	hwRequest, err := tink.GenerateHWRequest(regoReq, regoURL.(string))
+	hwRequest, err := tink.GenerateHWRequest(regoReq, regoURL)
 	if err != nil {
 		return regoStatus, errors.Wrap(err, "error during generatehwrequest")
 	}

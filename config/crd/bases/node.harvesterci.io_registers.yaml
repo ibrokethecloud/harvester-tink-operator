@@ -36,6 +36,14 @@ spec:
           properties:
             address:
               type: string
+            dnsNameservers:
+              items:
+                type: string
+              type: array
+            environment:
+              additionalProperties:
+                type: string
+              type: object
             gateway:
               type: string
             interface:
@@ -44,16 +52,44 @@ spec:
               type: string
             macAddress:
               type: string
+            modules:
+              items:
+                type: string
+              type: array
             nameServers:
               items:
                 type: string
               type: array
             netmask:
               type: string
+            ntpServers:
+              items:
+                type: string
+              type: array
+            password:
+              type: string
+            sshAuthorizedKeys:
+              items:
+                type: string
+              type: array
+            sysctls:
+              additionalProperties:
+                type: string
+              type: object
             token:
               type: string
+            wifi:
+              items:
+                properties:
+                  name:
+                    type: string
+                  passphrase:
+                    type: string
+                type: object
+              type: array
           required:
           - interface
+          - isourl
           - macAddress
           - token
           type: object

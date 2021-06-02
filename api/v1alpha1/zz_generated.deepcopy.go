@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/installer"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -153,6 +154,45 @@ func (in *RegisterSpec) DeepCopyInto(out *RegisterSpec) {
 		in, out := &in.Nameservers, &out.Nameservers
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.SSHAuthorizedKeys != nil {
+		in, out := &in.SSHAuthorizedKeys, &out.SSHAuthorizedKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Modules != nil {
+		in, out := &in.Modules, &out.Modules
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Sysctls != nil {
+		in, out := &in.Sysctls, &out.Sysctls
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.NTPServers != nil {
+		in, out := &in.NTPServers, &out.NTPServers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.DNSNameservers != nil {
+		in, out := &in.DNSNameservers, &out.DNSNameservers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Wifi != nil {
+		in, out := &in.Wifi, &out.Wifi
+		*out = make([]installer.Wifi, len(*in))
+		copy(*out, *in)
+	}
+	if in.Environment != nil {
+		in, out := &in.Environment, &out.Environment
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 }
 

@@ -1,1 +1,111 @@
 package http
+
+import (
+	"context"
+	"net/http"
+
+	"k8s.io/apimachinery/pkg/labels"
+
+	"github.com/ghodss/yaml"
+	"github.com/go-logr/logr"
+	"github.com/gorilla/mux"
+	"github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
+	installer "github.com/ibrokethecloud/harvester-tink-operator/pkg/installer"
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/util"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+type ConfigServer struct {
+	client.Client
+	Log logr.Logger
+}
+
+func (c *ConfigServer) SetupRoutes(r *mux.Router) {
+	r.HandleFunc("/config/{uuid}", c.getConfig).Methods("GET")
+	c.Log.Info("adding config route")
+}
+
+func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	configUUID, ok := vars["uuid"]
+	if !ok {
+		util.ReturnHTTPMessage(w, r, 500, "error", "no config uuid passed in")
+		return
+	}
+	c.Log.Info("serving request " + configUUID)
+	nodeList := &v1alpha1.RegisterList{}
+	nodeLabels, err := labels.Parse("uuid=" + configUUID)
+	if err != nil {
+		util.ReturnHTTPMessage(w, r, 500, "error", "label parsing error")
+	}
+	opts := &client.ListOptions{LabelSelector: nodeLabels}
+	err = c.List(context.Background(), nodeList, opts)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			util.ReturnHTTPMessage(w, r, 404, "error", "no config found")
+			return
+		} else {
+			util.ReturnHTTPMessage(w, r, 500, "error", "internal error")
+			return
+		}
+	}
+
+	if len(nodeList.Items) != 1 {
+		util.ReturnHTTPMessage(w, r, 500, "error", "multiple objects found")
+	}
+
+	node := nodeList.Items[0]
+	serverURL, err := util.FetchServerURL(c.Client)
+	if err != nil {
+		util.ReturnHTTPMessage(w, r, 500, "error", "server-url fetch error")
+		return
+	}
+
+	os := installer.OS{
+		Hostname: node.Name,
+	}
+
+	network := installer.Network{
+		Interface: node.Spec.Interface,
+	}
+
+	if len(node.Spec.Address) != 0 && len(node.Spec.Netmask) != 0 && len(node.Spec.Gateway) != 0 {
+		network.IP = node.Spec.Address
+		network.SubnetMask = node.Spec.Netmask
+		network.Gateway = node.Spec.Gateway
+	}
+
+	if len(node.Spec.NTPServers) != 0 {
+		os.NTPServers = node.Spec.NTPServers
+	}
+
+	if len(node.Spec.DNSNameservers) != 0 {
+		network.DNSNameservers = node.Spec.DNSNameservers
+	}
+
+	install := installer.Install{
+		Networks: []installer.Network{
+			network,
+		},
+		Automatic:     true,
+		Mode:          "join",
+		MgmtInterface: node.Spec.Interface,
+		Device:        node.Spec.Interface,
+		ISOURL:        node.Spec.IsoURL,
+	}
+	config := installer.HarvesterConfig{
+		ServerURL: serverURL,
+		Token:     node.Spec.Token,
+		OS:        os,
+		Install:   install,
+	}
+	contentByte, err := yaml.Marshal(config)
+
+	if err != nil {
+		util.ReturnHTTPMessage(w, r, 500, "error", "error during config generation")
+		return
+	}
+
+	util.ReturnHTTPRaw(w, r, string(contentByte))
+}
