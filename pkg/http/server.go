@@ -53,6 +53,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 
 	if len(nodeList.Items) != 1 {
 		util.ReturnHTTPMessage(w, r, 500, "error", "multiple objects found")
+		return
 	}
 
 	node := nodeList.Items[0]
@@ -64,6 +65,28 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 
 	os := installer.OS{
 		Hostname: node.Name,
+	}
+
+	if len(node.Spec.SSHAuthorizedKeys) != 0 {
+		os.SSHAuthorizedKeys = node.Spec.SSHAuthorizedKeys
+	}
+
+	if len(node.Spec.Password) != 0 {
+		os.Password = node.Spec.Password
+	} else {
+		os.Password = node.Name
+	}
+
+	if len(node.Spec.NTPServers) != 0 {
+		os.NTPServers = node.Spec.NTPServers
+	}
+
+	if len(node.Spec.DNSNameservers) != 0 {
+		os.DNSNameservers = node.Spec.NTPServers
+	}
+
+	if len(node.Spec.Environment) != 0 {
+		os.Environment = node.Spec.Environment
 	}
 
 	network := installer.Network{
@@ -92,7 +115,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		Mode:          "join",
 		MgmtInterface: node.Spec.Interface,
 		Device:        node.Spec.Interface,
-		ISOURL:        node.Spec.IsoURL,
+		ISOURL:        node.Spec.HarvesterISOURL,
 	}
 	config := installer.HarvesterConfig{
 		ServerURL: serverURL,

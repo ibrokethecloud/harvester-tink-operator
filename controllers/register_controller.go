@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
@@ -161,13 +162,15 @@ func (r *RegisterReconciler) generateHardware(ctx context.Context, regoReq *node
 	if err != nil {
 		return regoStatus, errors.Wrap(err, "error during generatehwrequest")
 	}
-
-	hwByte, err := json.Marshal(hwRequest)
+	bf := bytes.NewBuffer([]byte{})
+	customEncoder := json.NewEncoder(bf)
+	customEncoder.SetEscapeHTML(false)
+	err = customEncoder.Encode(hwRequest)
 	if err != nil {
 		return regoStatus, errors.Wrap(err, "error during hw request marshal")
 	}
 
-	r.Log.Info(string(hwByte))
+	r.Log.Info(string(bf.String()))
 	_, err = r.FullClient.HardwareClient.Push(ctx, &hardware.PushRequest{Data: hwRequest})
 	if err != nil {
 		return regoStatus, errors.Wrap(err, "error during hardware push")

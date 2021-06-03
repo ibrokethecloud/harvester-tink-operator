@@ -33,7 +33,8 @@ type RegisterSpec struct {
 	Address           string            `json:"address,omitempty"`
 	Netmask           string            `json:"netmask,omitempty"`
 	Gateway           string            `json:"gateway,omitempty"`
-	IsoURL            string            `json:"isourl"`
+	PXEIsoURL         string            `json:"pxeIsourl,omitempty"`
+	HarvesterISOURL   string            `json:"harvesterIsoURL"`
 	SSHAuthorizedKeys []string          `json:"sshAuthorizedKeys,omitempty"`
 	Modules           []string          `json:"modules,omitempty"`
 	Sysctls           map[string]string `json:"sysctls,omitempty"`

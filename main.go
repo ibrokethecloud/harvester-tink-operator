@@ -17,9 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
-	"sync"
 
 	web "net/http"
 
@@ -106,16 +106,20 @@ func main() {
 	}
 	configServer.SetupRoutes(router)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	webServer := web.Server{
+		Addr:    ":" + nodev1alpha1.DefaultConfigURLPort,
+		Handler: router,
+	}
 	go func() {
-		defer wg.Done()
-		err = web.ListenAndServe(":"+nodev1alpha1.DefaultConfigURLPort, router)
+		err = webServer.ListenAndServe()
 		if err != nil {
 			os.Exit(1)
 		}
 	}()
 
+	defer func() {
+		_ = webServer.Shutdown(context.Background())
+	}()
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
@@ -124,5 +128,4 @@ func main() {
 		os.Exit(1)
 	}
 
-	wg.Wait()
 }

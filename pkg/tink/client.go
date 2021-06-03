@@ -1,11 +1,12 @@
 package tink
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
+	"text/template"
 
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
 
@@ -57,16 +58,16 @@ func GenerateHWRequest(regoReq *nodev1alpha1.Register, serverURL string) (hw *ha
 	}
 
 	// Specify non default location to load ISO's
-	if len(regoReq.Spec.IsoURL) != 0 {
-		networkInterfaces.Netboot.Osie = &hardware.Hardware_Netboot_Osie{BaseUrl: regoReq.Spec.IsoURL}
+	if len(regoReq.Spec.PXEIsoURL) != 0 {
+		networkInterfaces.Netboot.Osie = &hardware.Hardware_Netboot_Osie{BaseUrl: regoReq.Spec.PXEIsoURL}
 	}
 
 	ip := &hardware.Hardware_DHCP_IP{}
 
 	dhcpRequest := &hardware.Hardware_DHCP{
-		Mac:       regoReq.Spec.MacAddress,
-		IfaceName: regoReq.Spec.Interface,
-		Ip:        ip,
+		Mac:      regoReq.Spec.MacAddress,
+		Ip:       ip,
+		Hostname: regoReq.Name,
 	}
 
 	if len(regoReq.Spec.Address) != 0 && len(regoReq.Spec.Gateway) != 0 && len(regoReq.Spec.Netmask) != 0 {
@@ -86,27 +87,10 @@ func GenerateHWRequest(regoReq *nodev1alpha1.Register, serverURL string) (hw *ha
 
 	urlArr := strings.Split(url.Host, ":")
 
-	// url for fetching config data for new node //
-	configUrl := fmt.Sprintf("http://%s:%s/config/%s", urlArr[0], nodev1alpha1.DefaultConfigURLPort, regoReq.Status.UUID)
-
-	userData := fmt.Sprintf("harvester.install.config_url=%s", configUrl)
-	m := nodev1alpha1.MetaData{
-		Facility: nodev1alpha1.Facility{
-			FacilityCode: "onprem",
-		},
-		Instance: nodev1alpha1.Instance{
-			UserData: userData,
-			OperatingSystem: nodev1alpha1.OperatingSystem{
-				Slug: "harvester_0_2_0",
-			},
-		},
-	}
-
-	mByte, err := json.Marshal(m)
+	m, err := generateMetaData(regoReq, urlArr[0])
 	if err != nil {
-		return hw, errors.Wrap(err, "error marshalling metadata")
+		return hw, errors.Wrap(err, "error during metadata generation")
 	}
-
 	hw = &hardware.Hardware{
 		Id: regoReq.Status.UUID,
 		Network: &hardware.Hardware_Network{
@@ -114,8 +98,33 @@ func GenerateHWRequest(regoReq *nodev1alpha1.Register, serverURL string) (hw *ha
 				networkInterfaces,
 			},
 		},
-		Metadata: string(mByte),
+		Metadata: m,
 	}
 
 	return hw, nil
+}
+
+func generateMetaData(regoReq *nodev1alpha1.Register, serverURL string) (metadata string, err error) {
+
+	var tmpStruct struct {
+		ServerUrl   string
+		DefaultPort string
+		UUID        string
+	}
+	var output bytes.Buffer
+	tmpStruct.ServerUrl = serverURL
+	tmpStruct.DefaultPort = nodev1alpha1.DefaultConfigURLPort
+	tmpStruct.UUID = regoReq.Status.UUID
+	var metaDataStruct = `{"facility":{"facility_code":"onprem"},"instance":{"userdata":"harvester.install.config_url=http://{{ .ServerUrl }}:{{ .DefaultPort }}/config/{{ .UUID }}" ,"operating_system":{"slug":"harvester_0_2_0"}}}`
+
+	metadataTmpl := template.Must(template.New("MetData").Parse(metaDataStruct))
+
+	err = metadataTmpl.Execute(&output, tmpStruct)
+
+	if err != nil {
+		return metadata, err
+	}
+
+	metadata = output.String()
+	return metadata, nil
 }

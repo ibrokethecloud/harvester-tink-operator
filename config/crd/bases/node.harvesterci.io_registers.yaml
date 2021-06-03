@@ -46,9 +46,9 @@ spec:
               type: object
             gateway:
               type: string
-            interface:
+            harvesterIsoURL:
               type: string
-            isourl:
+            interface:
               type: string
             macAddress:
               type: string
@@ -67,6 +67,8 @@ spec:
                 type: string
               type: array
             password:
+              type: string
+            pxeIsourl:
               type: string
             sshAuthorizedKeys:
               items:
@@ -88,8 +90,8 @@ spec:
                 type: object
               type: array
           required:
+          - harvesterIsoURL
           - interface
-          - isourl
           - macAddress
           - token
           type: object

@@ -1,5 +1,8 @@
 package installer
 
+// Copy of HarvesterInstall config https://github.com/harvester/harvester-installer/pkg/config
+// to avoid dep hell
+
 type Network struct {
 	Interface      string   `json:"interface,omitempty"`
 	Method         string   `json:"method,omitempty"`
