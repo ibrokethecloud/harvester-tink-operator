@@ -1,4 +1,4 @@
-## Harvester tinkberll operator
+## Harvester tinkerbell operator
 Simple operator to run on your Harvester cluster, to allow harvester to leverage tinkerbell to add more worker nodes to itself.
 
 The operator uses the custom harvester installer in tinkerbell [boots](https://github.com/ibrokethecloud/boots/tree/harvester/installers/harvester).
