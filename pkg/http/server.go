@@ -107,6 +107,10 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		network.DNSNameservers = node.Spec.DNSNameservers
 	}
 
+	disk := "/dev/sda"
+	if len(node.Spec.Disk) != 0 {
+		disk = node.Spec.Disk
+	}
 	install := installer.Install{
 		Networks: []installer.Network{
 			network,
@@ -114,7 +118,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		Automatic:     true,
 		Mode:          "join",
 		MgmtInterface: node.Spec.Interface,
-		Device:        node.Spec.Interface,
+		Device:        disk,
 		ISOURL:        node.Spec.HarvesterISOURL,
 	}
 	config := installer.HarvesterConfig{

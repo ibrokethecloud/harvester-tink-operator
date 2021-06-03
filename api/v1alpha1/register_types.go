@@ -43,6 +43,7 @@ type RegisterSpec struct {
 	Wifi              []installer.Wifi  `json:"wifi,omitempty"`
 	Password          string            `json:"password,omitempty"`
 	Environment       map[string]string `json:"environment,omitempty"`
+	Disk              string            `json:"disk,omitempty"`
 }
 
 // RegisterStatus defines the observed state of Register

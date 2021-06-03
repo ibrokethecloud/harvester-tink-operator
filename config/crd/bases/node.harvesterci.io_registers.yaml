@@ -36,6 +36,8 @@ spec:
           properties:
             address:
               type: string
+            disk:
+              type: string
             dnsNameservers:
               items:
                 type: string
