@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -63,6 +64,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	serverURLArr := strings.Split(serverURL, ":")
 	os := installer.OS{
 		Hostname: node.Name,
 	}
@@ -122,7 +124,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		ISOURL:        node.Spec.HarvesterISOURL,
 	}
 	config := installer.HarvesterConfig{
-		ServerURL: serverURL,
+		ServerURL: strings.Join(serverURLArr[:len(serverURLArr)-1], ":") + ":6443",
 		Token:     node.Spec.Token,
 		OS:        os,
 		Install:   install,
