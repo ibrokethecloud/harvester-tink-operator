@@ -20,6 +20,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	"strings"
 
 	"github.com/tinkerbell/tink/protos/hardware"
@@ -32,6 +36,7 @@ import (
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
 	"github.com/pkg/errors"
 	hw "github.com/tinkerbell/tink/client"
+	"k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -111,8 +116,22 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 }
 
 func (r *RegisterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nodev1alpha1.Register{}).
+		Watches(&source.Kind{Type: &v1.Node{}},
+			&handler.EnqueueRequestsFromMapFunc{
+				ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      a.Meta.GetName(),
+								Namespace: a.Meta.GetNamespace(),
+							},
+						},
+					}
+				}),
+			}).
 		Complete(r)
 }
 
@@ -197,4 +216,19 @@ func (r *RegisterReconciler) deleteHardware(ctx context.Context, uuid string) (e
 func (r *RegisterReconciler) getHardware(ctx context.Context, uuid string) (hw *hardware.Hardware, err error) {
 	hw, err = r.FullClient.HardwareClient.ByID(ctx, &hardware.GetRequest{Id: uuid})
 	return hw, err
+}
+
+func (r *RegisterReconciler) doesNodeExist(ctx context.Context, regoReq *nodev1alpha1.Register) (ok bool, err error) {
+	node := &v1.Node{}
+	err = r.Get(ctx, types.NamespacedName{Namespace: regoReq.Namespace, Name: regoReq.Name}, node)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			return ok, nil
+		} else {
+			return ok, err
+		}
+	}
+
+	// assuming node has been found and there were no errors finding it
+	return ok, nil
 }

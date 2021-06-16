@@ -33,8 +33,7 @@ type RegisterSpec struct {
 	Address           string            `json:"address,omitempty"`
 	Netmask           string            `json:"netmask,omitempty"`
 	Gateway           string            `json:"gateway,omitempty"`
-	PXEIsoURL         string            `json:"pxeIsourl,omitempty"`
-	HarvesterISOURL   string            `json:"harvesterIsoURL"`
+	PXEIsoURL         string            `json:"pxeIsoURL,omitempty"`
 	SSHAuthorizedKeys []string          `json:"sshAuthorizedKeys,omitempty"`
 	Modules           []string          `json:"modules,omitempty"`
 	Sysctls           map[string]string `json:"sysctls,omitempty"`
@@ -56,6 +55,7 @@ type RegisterStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder;resource:scope="Cluster"
 
 // Register is the Schema for the registers API
 type Register struct {

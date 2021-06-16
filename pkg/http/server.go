@@ -121,8 +121,13 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		Mode:          "join",
 		MgmtInterface: node.Spec.Interface,
 		Device:        disk,
-		ISOURL:        node.Spec.HarvesterISOURL,
+		ISOURL:        v1alpha1.DefaultISOURL,
 	}
+
+	if len(node.Spec.PXEIsoURL) != 0 {
+		install.ISOURL = node.Spec.PXEIsoURL
+	}
+
 	config := installer.HarvesterConfig{
 		ServerURL: strings.Join(serverURLArr[:len(serverURLArr)-1], ":") + ":6443",
 		Token:     node.Spec.Token,
