@@ -88,7 +88,25 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			// make hardware call
 			newStatus, err = r.generateHardware(ctx, regoReq)
 		case HWPushed:
-			return ctrl.Result{}, nil
+			_, ok := regoReq.Labels["nodeReady"]
+			if ok {
+				return ctrl.Result{}, nil
+			} else {
+				// check if node exists already in which case its time to label
+				ok, err := r.doesNodeExist(ctx, regoReq)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				if !ok {
+					// node doest exist yet. Ignore and wait for watcher to requeue
+					return ctrl.Result{}, nil
+				} else {
+					regoReq.Labels["nodeReady"] = "true"
+					newStatus = regoReq.Status.DeepCopy()
+				}
+			}
+
 		}
 		regoReq.Status = *newStatus
 		controllerutil.AddFinalizer(regoReq, regoFinalizer)
@@ -230,5 +248,6 @@ func (r *RegisterReconciler) doesNodeExist(ctx context.Context, regoReq *nodev1a
 	}
 
 	// assuming node has been found and there were no errors finding it
+	ok = true
 	return ok, nil
 }
