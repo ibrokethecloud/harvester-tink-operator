@@ -53,11 +53,17 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(nodeList.Items) != 1 {
-		util.ReturnHTTPMessage(w, r, 500, "error", "multiple objects found")
+		util.ReturnHTTPMessage(w, r, 500, "error", "object lookup error")
 		return
 	}
 
 	node := nodeList.Items[0]
+
+	// check if node is already registered in which case disable serving the url //
+	if _, ok := node.Labels["nodeReady"]; ok {
+		util.ReturnHTTPMessage(w, r, 200, "info", "node already processed")
+		return
+	}
 	serverURL, err := util.FetchServerURL(c.Client)
 	if err != nil {
 		util.ReturnHTTPMessage(w, r, 500, "error", "server-url fetch error")

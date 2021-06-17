@@ -48,6 +48,7 @@ const (
 	regoFinalizer = "register.harvesterci.io"
 	UIDGenerated  = "uidgenerated"
 	HWPushed      = "hardwarepushed"
+	NodeProcessed = "nodeprocessed"
 )
 
 // RegisterReconciler reconciles a Register object
@@ -104,10 +105,13 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				} else {
 					regoReq.Labels["nodeReady"] = "true"
 					newStatus = regoReq.Status.DeepCopy()
+					newStatus.Status = NodeProcessed
 				}
 			}
-
+		case NodeProcessed:
+			return ctrl.Result{}, nil
 		}
+
 		regoReq.Status = *newStatus
 		controllerutil.AddFinalizer(regoReq, regoFinalizer)
 		if err != nil {

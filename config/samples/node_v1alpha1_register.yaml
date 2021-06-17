@@ -2,7 +2,6 @@ apiVersion: node.harvesterci.io/v1alpha1
 kind: Register
 metadata:
   name: node2
-  namespace: harvester-operator
 spec:
   # Add fields here
   macAddress: "0c:c4:7a:6b:80:d0"

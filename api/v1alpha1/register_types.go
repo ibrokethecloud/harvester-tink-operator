@@ -55,7 +55,9 @@ type RegisterStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder;resource:scope="Cluster"
+// +kubebuilder:resource:scope="Cluster"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.status`
+// +kubebuilder:printcolumn:name="UUID",type="string",JSONPath=`.status.uuid`
 
 // Register is the Schema for the registers API
 type Register struct {

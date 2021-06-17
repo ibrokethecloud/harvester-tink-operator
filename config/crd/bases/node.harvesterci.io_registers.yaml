@@ -8,13 +8,21 @@ metadata:
   creationTimestamp: null
   name: registers.node.harvesterci.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.status
+    name: Status
+    type: string
+  - JSONPath: .status.uuid
+    name: UUID
+    type: string
   group: node.harvesterci.io
   names:
     kind: Register
     listKind: RegisterList
     plural: registers
     singular: register
-  scope: Namespaced
+  scope: Cluster
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: Register is the Schema for the registers API
