@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -52,17 +53,24 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(nodeList.Items) != 1 {
-		util.ReturnHTTPMessage(w, r, 500, "error", "multiple objects found")
+		util.ReturnHTTPMessage(w, r, 500, "error", "object lookup error")
 		return
 	}
 
 	node := nodeList.Items[0]
+
+	// check if node is already registered in which case disable serving the url //
+	if _, ok := node.Labels["nodeReady"]; ok {
+		util.ReturnHTTPMessage(w, r, 200, "info", "node already processed")
+		return
+	}
 	serverURL, err := util.FetchServerURL(c.Client)
 	if err != nil {
 		util.ReturnHTTPMessage(w, r, 500, "error", "server-url fetch error")
 		return
 	}
 
+	serverURLArr := strings.Split(serverURL, ":")
 	os := installer.OS{
 		Hostname: node.Name,
 	}
@@ -119,10 +127,15 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		Mode:          "join",
 		MgmtInterface: node.Spec.Interface,
 		Device:        disk,
-		ISOURL:        node.Spec.HarvesterISOURL,
+		ISOURL:        v1alpha1.DefaultISOURL,
 	}
+
+	if len(node.Spec.PXEIsoURL) != 0 {
+		install.ISOURL = node.Spec.PXEIsoURL
+	}
+
 	config := installer.HarvesterConfig{
-		ServerURL: serverURL,
+		ServerURL: strings.Join(serverURLArr[:len(serverURLArr)-1], ":") + ":6443",
 		Token:     node.Spec.Token,
 		OS:        os,
 		Install:   install,

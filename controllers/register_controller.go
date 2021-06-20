@@ -20,6 +20,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	"strings"
 
 	"github.com/tinkerbell/tink/protos/hardware"
@@ -32,6 +36,7 @@ import (
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
 	"github.com/pkg/errors"
 	hw "github.com/tinkerbell/tink/client"
+	"k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,6 +48,7 @@ const (
 	regoFinalizer = "register.harvesterci.io"
 	UIDGenerated  = "uidgenerated"
 	HWPushed      = "hardwarepushed"
+	NodeProcessed = "nodeprocessed"
 )
 
 // RegisterReconciler reconciles a Register object
@@ -83,8 +89,29 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			// make hardware call
 			newStatus, err = r.generateHardware(ctx, regoReq)
 		case HWPushed:
+			_, ok := regoReq.Labels["nodeReady"]
+			if ok {
+				return ctrl.Result{}, nil
+			} else {
+				// check if node exists already in which case its time to label
+				ok, err := r.doesNodeExist(ctx, regoReq)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				if !ok {
+					// node doest exist yet. Ignore and wait for watcher to requeue
+					return ctrl.Result{}, nil
+				} else {
+					regoReq.Labels["nodeReady"] = "true"
+					newStatus = regoReq.Status.DeepCopy()
+					newStatus.Status = NodeProcessed
+				}
+			}
+		case NodeProcessed:
 			return ctrl.Result{}, nil
 		}
+
 		regoReq.Status = *newStatus
 		controllerutil.AddFinalizer(regoReq, regoFinalizer)
 		if err != nil {
@@ -111,8 +138,22 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 }
 
 func (r *RegisterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nodev1alpha1.Register{}).
+		Watches(&source.Kind{Type: &v1.Node{}},
+			&handler.EnqueueRequestsFromMapFunc{
+				ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      a.Meta.GetName(),
+								Namespace: a.Meta.GetNamespace(),
+							},
+						},
+					}
+				}),
+			}).
 		Complete(r)
 }
 
@@ -197,4 +238,20 @@ func (r *RegisterReconciler) deleteHardware(ctx context.Context, uuid string) (e
 func (r *RegisterReconciler) getHardware(ctx context.Context, uuid string) (hw *hardware.Hardware, err error) {
 	hw, err = r.FullClient.HardwareClient.ByID(ctx, &hardware.GetRequest{Id: uuid})
 	return hw, err
+}
+
+func (r *RegisterReconciler) doesNodeExist(ctx context.Context, regoReq *nodev1alpha1.Register) (ok bool, err error) {
+	node := &v1.Node{}
+	err = r.Get(ctx, types.NamespacedName{Namespace: regoReq.Namespace, Name: regoReq.Name}, node)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			return ok, nil
+		} else {
+			return ok, err
+		}
+	}
+
+	// assuming node has been found and there were no errors finding it
+	ok = true
+	return ok, nil
 }
