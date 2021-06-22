@@ -1,0 +1,20 @@
+# Default values for harvester-tink-installer.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## Does tink need to be installed on cluster
+## Default is "true"
+tinkInstall: true
+
+# If tinkInstall is set to false, then we can specify external tinkerbell setup
+tinkCertURL: "remote_tink_cert_url"
+tinkGrpcAuthURL: "remote_tink_grpc_auth_url"
+
+images:
+  harvesterTinkOperator: gmehta3/harvester-tink-operator:dev
+  boots: gmehta3/boots:harvester2
+  tinkCli: quay.io/tinkerbell/tink-cli:sha-1b178dae
+  tinkServer: quay.io/tinkerbell/tink:sha-1b178dae
+  tinkServerInit: busybox:latest
+  db: docker.io/postgres:10-alpine
+

@@ -1,0 +1,66 @@
+{{ if .Values.tinkInstall }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: boots
+data:
+  DATA_MODEL_VERSION: "1"
+  DNS_SERVERS: 8.8.8.8
+  DOCKER_REGISTRY: "registry"
+  MIRROR_BASE_URL: "http://nginx"
+  TINKERBELL_CERT_URL: http://tink-server:42114/cert
+  TINKERBELL_GRPC_AUTHORITY: tink-server:42113
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db
+stringData:
+  POSTGRES_DB: "tinkerbell"
+  POSTGRES_PASSWORD:  "tinkerbell"
+  PGHOST: "db"
+  PGPORT: "5432"
+  PGPASSWORD: "tinkerbell"
+  PGDATABASE: "tinkerbell"
+  PGSSLMODE: "disable"
+  PGUSER: "tinkerbell"
+  POSTGRES_USER: "tinkerbell"
+  PGDATA: "/var/lib/postgresql/data/tinkerbell/"
+type: Opaque
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: packet
+stringData:
+  API_AUTH_TOKEN: "ignored"
+  API_BASE_URL:  "ignored"
+  API_CONSUMER_TOKEN: "ignored"
+  PACKET_ENV: "testing"
+  PACKET_VERSION: "ignored"
+  ROLLBAR_DISABLE: "1"
+  ROLLBAR_TOKEN: "ignored"
+type: Opaque
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry
+stringData:
+  REGISTRY_HOST: "registry"
+  REGISTRY_USERNAME: "admin"
+  REGISTRY_PASSWORD: "password"
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tink-auth
+stringData:
+  TINK_AUTH_USERNAME: "admin"
+  TINK_AUTH_PASSWORD: "password"
+type: Opaque
+{{ end }}
