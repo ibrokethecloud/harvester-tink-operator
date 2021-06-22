@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harvester-tink-operator
+  labels:
+    operator: harvester-tink-operator
+spec:
+  selector:
+    matchLabels:
+      operator: harvester-tink-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        operator: harvester-tink-operator
+    spec:
+      containers:
+      - image: {{ .Values.images.harvesterTinkOperator }}
+        imagePullPolicy: Always
+        name: manager
+        ports:
+        - containerPort: 30880
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: harvester-tink-operator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harvester-tink-operator
+  labels:
+    operator: harvester-tink-operator
+spec:
+  type: NodePort
+  ports:
+  - port: 30880
+    nodePort: 30880
+    protocol: TCP
+    targetPort: 30880
+  selector:
+    operator: harvester-tink-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harvester-tink-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: harvester-tink-operator
+subjects:
+- kind: ServiceAccount
+  name: harvester-tink-operator
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tinkconfig
+  namespace: harvester-operator
+data:
+  CERT_URL: {{ if .Values.tinkInstall }}http://tink-server:42114/cert{{else}}{{ .Values.tinkCertURL }}{{ end }}
+  GRPC_AUTH_URL: {{ if .Values.tinkInstall }}tink-server:42113{{else}}{{ .Values.tinkGrpcAuthURL }}{{ end }}
+---  

@@ -1,0 +1,83 @@
+{{ if .Values.tinkInstall }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: boots
+  name: boots
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: boots
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+      labels:
+        app: boots
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - args:
+            - -log-level
+            - DEBUG
+          envFrom:
+            - configMapRef:
+                name: boots
+            - secretRef:
+                name: packet
+            - secretRef:
+                name: registry
+          env:
+            - name: BOOTP_BIND
+              value: 0.0.0.0:67
+            - name: FACILITY_CODE
+              value: "onprem"
+            - name: HTTP_BIND
+              value: 0.0.0.0:80
+            - name: SYSLOG_BIND
+              value: 0.0.0.0:514
+            - name: TFTP_BIND
+              value: 0.0.0.0:69
+            - name: PUBLIC_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          image: gmehta3/boots:harvester2
+          imagePullPolicy: Always
+          name: boots
+          ports:
+            - containerPort: 67
+              name: dhcp
+            - containerPort: 69
+              name: tftp
+            - containerPort: 80
+              name: http
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: boots
+  name: boots
+spec:
+  ports:
+    - name: dhcp
+      port: 67
+      protocol: UDP
+      targetPort: dhcp
+    - name: tftp
+      port: 69
+      protocol: UDP
+      targetPort: tftp
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: boots
+{{ end }}

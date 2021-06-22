@@ -1,0 +1,26 @@
+{{ if .Values.tinkInstall }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: tink-cli
+  name: tink-cli
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tink-cli
+  template:
+    metadata:
+      labels:
+        app: tink-cli
+    spec:
+      containers:
+        - envFrom:
+            - configMapRef:
+                name: boots
+          image: {{ .Values.images.tinkCli }}
+          imagePullPolicy: Always
+          name: tink-cli
+      restartPolicy: Always
+{{ end }}      
