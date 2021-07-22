@@ -2,10 +2,8 @@ package http
 
 import (
 	"context"
-	"net/http"
-	"strings"
-
 	"k8s.io/apimachinery/pkg/labels"
+	"net/http"
 
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
@@ -64,13 +62,18 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		util.ReturnHTTPMessage(w, r, 200, "info", "node already processed")
 		return
 	}
-	serverURL, err := util.FetchServerURL(c.Client)
+
+	mode := "join"
+	if seedVal, ok := node.Labels["leader"]; ok && seedVal == "true" {
+		mode = "create"
+	}
+
+	serverURL, err := util.FetchServerURL(c.Client, &node)
 	if err != nil {
 		util.ReturnHTTPMessage(w, r, 500, "error", "server-url fetch error")
 		return
 	}
 
-	serverURLArr := strings.Split(serverURL, ":")
 	os := installer.OS{
 		Hostname: node.Name,
 	}
@@ -124,7 +127,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 			network,
 		},
 		Automatic:     true,
-		Mode:          "join",
+		Mode:          mode,
 		MgmtInterface: node.Spec.Interface,
 		Device:        disk,
 		ISOURL:        v1alpha1.DefaultISOURL,
@@ -135,11 +138,15 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	config := installer.HarvesterConfig{
-		ServerURL: strings.Join(serverURLArr[:len(serverURLArr)-1], ":") + ":6443",
-		Token:     node.Spec.Token,
-		OS:        os,
-		Install:   install,
+		Token:   node.Spec.Token,
+		OS:      os,
+		Install: install,
 	}
+
+	if mode == "join" {
+		config.ServerURL = serverURL
+	}
+
 	contentByte, err := yaml.Marshal(config)
 
 	if err != nil {

@@ -20,11 +20,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"strings"
 
 	"github.com/tinkerbell/tink/protos/hardware"
 
@@ -36,7 +38,7 @@ import (
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
 	"github.com/pkg/errors"
 	hw "github.com/tinkerbell/tink/client"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -74,6 +76,16 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 		log.Error(err, "unable to fetch instance")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	ok, err := util.DoesSettingExist(r.Client)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	ready, readyOK := regoReq.Labels["ready"]
+	if !ok && readyOK && ready != "true" {
+		return ctrl.Result{}, fmt.Errorf("Multi cluster mode. Waiting for node to be processed by cluster controller")
 	}
 
 	if regoReq.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -194,7 +206,7 @@ func (r *RegisterReconciler) generateHardware(ctx context.Context, regoReq *node
 
 	regoStatus = regoReq.Status.DeepCopy()
 
-	regoURL, err := util.FetchServerURL(r.Client)
+	regoURL, err := util.FetchServerURL(r.Client, regoReq)
 	if err != nil {
 		return regoStatus, errors.Wrap(err, "error fetching server url")
 	}

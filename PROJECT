@@ -4,4 +4,7 @@ resources:
 - group: node
   kind: Register
   version: v1alpha1
+- group: node
+  kind: Cluster
+  version: v1alpha1
 version: "2"

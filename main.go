@@ -24,16 +24,17 @@ import (
 	web "net/http"
 
 	"github.com/gorilla/mux"
-	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
-	"github.com/ibrokethecloud/harvester-tink-operator/controllers"
-	"github.com/ibrokethecloud/harvester-tink-operator/pkg/http"
-	"github.com/ibrokethecloud/harvester-tink-operator/pkg/tink"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
+	"github.com/ibrokethecloud/harvester-tink-operator/controllers"
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/http"
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/tink"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -120,6 +121,14 @@ func main() {
 	defer func() {
 		_ = webServer.Shutdown(context.Background())
 	}()
+	if err = (&controllers.ClusterReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
