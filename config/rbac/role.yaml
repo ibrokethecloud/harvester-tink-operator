@@ -9,6 +9,26 @@ rules:
 - apiGroups:
   - node.harvesterci.io
   resources:
+  - clusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - node.harvesterci.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - node.harvesterci.io
+  resources:
   - registers
   verbs:
   - create

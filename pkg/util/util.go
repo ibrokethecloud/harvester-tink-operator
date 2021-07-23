@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"strconv"
 	"strings"
 
+	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/pkg/errors"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -129,7 +130,7 @@ func DoesSettingExist(client client.Client) (ok bool, err error) {
 	}
 
 	for _, crd := range crdList.Items {
-		if crd.Name == "settings.harvesters.io" {
+		if crd.Name == "settings.harvesterhci.io" {
 			ok = true
 		}
 	}

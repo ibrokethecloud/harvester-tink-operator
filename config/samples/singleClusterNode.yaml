@@ -1,0 +1,11 @@
+apiVersion: node.harvesterci.io/v1alpha1
+kind: Register
+metadata:
+  name: node2
+spec:
+  macAddress: "0c:c4:7a:6b:80:d0"
+  token: token
+  interface: eth0
+  address: 172.16.128.11
+  netmask: 255.255.248.0
+  gateway: 172.16.128.1

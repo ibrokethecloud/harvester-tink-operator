@@ -2,8 +2,9 @@ package http
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/labels"
 	"net/http"
+
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
@@ -70,6 +71,7 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 
 	serverURL, err := util.FetchServerURL(c.Client, &node)
 	if err != nil {
+		c.Log.Error(err, "error fetching server-url")
 		util.ReturnHTTPMessage(w, r, 500, "error", "server-url fetch error")
 		return
 	}

@@ -18,22 +18,24 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/go-logr/logr"
+	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/util"
 	"github.com/pkg/errors"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
-	"github.com/ibrokethecloud/harvester-tink-operator/pkg/util"
 )
 
 // ClusterReconciler reconciles a Cluster object
@@ -57,7 +59,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	if !ok {
+	if ok {
 		// operator is installed on a harvester cluster.
 		// skip reconcile of cluster objects since we will run in single cluster mode
 		return ctrl.Result{}, err
@@ -76,9 +78,9 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if clusterReq.ObjectMeta.DeletionTimestamp.IsZero() {
 		// reconcile the cluster objects
 		var err error
-		newStatus := &nodev1alpha1.ClusterStatus{}
-
-		switch clusterReq.Status.DeepCopy().Status {
+		newStatus := clusterReq.Status.DeepCopy()
+		log.Info("before switch")
+		switch newStatus.Status {
 		case "":
 			// filter and identify nodes
 			newStatus, err = r.IdentifyNodes(ctx, clusterReq)
@@ -104,6 +106,24 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{Requeue: true}, r.Update(ctx, clusterReq)
 	} else {
 		// Filter on all nodes with the cluster name label and prune them
+		if containsString(clusterReq.ObjectMeta.Finalizers, regoFinalizer) {
+			for _, node := range clusterReq.Status.Members {
+				delNode := &nodev1alpha1.Register{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: node,
+					},
+				}
+				err = r.Delete(ctx, delNode)
+				if err != nil {
+					return ctrl.Result{}, errors.Wrap(err, "error deleting register object")
+				}
+			}
+			controllerutil.RemoveFinalizer(clusterReq, regoFinalizer)
+			if err := r.Update(ctx, clusterReq); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
 	}
 
 	return ctrl.Result{}, nil
@@ -151,19 +171,13 @@ func (r *ClusterReconciler) IdentifyNodes(ctx context.Context, req *nodev1alpha1
 	if err != nil {
 		return status, errors.Wrap(err, "error fetching node list")
 	}
-
-	nodeStatusMap := make(map[string]string)
-
-	if len(status.NodeStatus) != 0 {
-		nodeStatusMap = status.NodeStatus
-	}
-
+	var memberList []string
 	for _, node := range nodeList.Items {
-		if _, ok := nodeStatusMap[node.Name]; !ok {
-			nodeStatusMap[node.Name] = ""
+		if !containsString(status.Members, node.Name) {
+			memberList = append(memberList, node.Name)
 		}
 	}
-
+	status.Members = memberList
 	status.Status = "ElectLeader"
 	return status, nil
 }
@@ -174,23 +188,41 @@ func (r *ClusterReconciler) ElectLeader(ctx context.Context, req *nodev1alpha1.C
 
 	status = req.Status.DeepCopy()
 	var leaderExists bool
+	possibleLeaderNodes := make(map[string]*nodev1alpha1.Register)
 	var leaderNode *nodev1alpha1.Register
-	for _, node := range req.Status.NodeStatus {
-		leaderNode, err = r.getNode(ctx, types.NamespacedName{Namespace: "", Name: node})
-		if err != nil {
-			return status, err
-		}
-
+	for _, node := range req.Status.Members {
 		if !leaderExists {
-			leader, ok := leaderNode.Labels["leader"]
-			if ok && leader == "true" {
-				leaderExists = true
+			node, err := r.getNode(ctx, types.NamespacedName{Namespace: "", Name: node})
+			if err != nil {
+				return status, err
 			}
-		}
 
+			leader, ok := node.Labels["leader"]
+			// need a node with a static address. Else ignore this node from leader election.
+			if ok && leader == "true" && node.Spec.Address != "" {
+				leaderExists = true
+				leaderNode = node
+			}
+
+			// unset leader label
+			if ok && leader == "true" && node.Spec.Address == "" {
+				delete(node.Labels, "leader")
+				if err := r.Update(ctx, node); err != nil {
+					return status, errors.Wrap(err, "unable to unset leader label from node")
+				}
+			}
+
+			if !leaderExists && node.Spec.Address != "" {
+				possibleLeaderNodes[node.Name] = node
+			}
+
+		}
 	}
 
 	if !leaderExists {
+		for _, node := range possibleLeaderNodes {
+			leaderNode = node
+		}
 		leaderLabels := make(map[string]string)
 		leaderLabels = leaderNode.GetLabels()
 		leaderLabels["leader"] = "true"
@@ -202,13 +234,17 @@ func (r *ClusterReconciler) ElectLeader(ctx context.Context, req *nodev1alpha1.C
 		return status, err
 	}
 
+	// in case we are unable to find a leader //
+	if !leaderExists {
+		return status, fmt.Errorf("Unable to elect a leader for the cluster %s. A cluster needs a leader with a static address and label leader=true", req.Name)
+	}
 	status.Status = "PatchNodes"
 	return status, nil
 }
 
 func (r *ClusterReconciler) PatchNodes(ctx context.Context, req *nodev1alpha1.Cluster) (status *nodev1alpha1.ClusterStatus, err error) {
 	status = req.Status.DeepCopy()
-	for _, node := range status.NodeStatus {
+	for _, node := range status.Members {
 		registerReq, err := r.getNode(ctx, types.NamespacedName{Name: node, Namespace: ""})
 		if err != nil {
 			return status, err
@@ -236,7 +272,6 @@ func (r *ClusterReconciler) PatchNodes(ctx context.Context, req *nodev1alpha1.Cl
 			return status, err
 		}
 
-		status.NodeStatus[node] = "ready"
 	}
 
 	status.Status = "NodeSubmitted"
@@ -259,20 +294,23 @@ func (r *ClusterReconciler) ReconcileNodes(ctx context.Context, req *nodev1alpha
 
 	var additionalNodes bool
 	var missingNodes bool
-	for _, node := range newStatus.NodeStatus {
-		_, ok := currentStatus.NodeStatus[node]
-		if !ok {
+	var missingMembers []string
+	for _, node := range newStatus.Members {
+		if !containsString(currentStatus.Members, node) {
 			additionalNodes = true
-			currentStatus.NodeStatus[node] = ""
 		}
 	}
 
-	for _, node := range currentStatus.NodeStatus {
-		_, ok := newStatus.NodeStatus[node]
-		if !ok {
+	for _, node := range currentStatus.Members {
+		if !containsString(newStatus.Members, node) {
 			missingNodes = true
-			delete(currentStatus.NodeStatus, node)
+			// delete element from the list
+			missingMembers = append(missingMembers, node)
 		}
+	}
+
+	for _, member := range missingMembers {
+		currentStatus.Members = removeElement(currentStatus.Members, member)
 	}
 
 	if additionalNodes {
@@ -285,4 +323,14 @@ func (r *ClusterReconciler) ReconcileNodes(ctx context.Context, req *nodev1alpha
 	}
 
 	return result, nil
+}
+
+func removeElement(in []string, value string) (out []string) {
+	for _, element := range in {
+		if element != value {
+			out = append(out, element)
+		}
+	}
+
+	return out
 }

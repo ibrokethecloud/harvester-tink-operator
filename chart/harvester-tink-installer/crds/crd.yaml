@@ -2,7 +2,122 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.2.5
+    controller-gen.kubebuilder.io/version: v0.3.0
+  creationTimestamp: null
+  name: clusters.node.harvesterci.io
+spec:
+  group: node.harvesterci.io
+  names:
+    kind: Cluster
+    listKind: ClusterList
+    plural: clusters
+    singular: cluster
+  scope: Cluster
+  validation:
+    openAPIV3Schema:
+      description: Cluster is the Schema for the clusters API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ClusterSpec defines the desired state of Cluster
+          properties:
+            disk:
+              type: string
+            dnsNameservers:
+              items:
+                type: string
+              type: array
+            environment:
+              additionalProperties:
+                type: string
+              type: object
+            gateway:
+              type: string
+            modules:
+              items:
+                type: string
+              type: array
+            nameServers:
+              items:
+                type: string
+              type: array
+            netmask:
+              type: string
+            ntpServers:
+              items:
+                type: string
+              type: array
+            password:
+              type: string
+            pxeIsoURL:
+              type: string
+            sshAuthorizedKeys:
+              items:
+                type: string
+              type: array
+            sysctls:
+              additionalProperties:
+                type: string
+              type: object
+            token:
+              type: string
+            wifi:
+              items:
+                properties:
+                  name:
+                    type: string
+                  passphrase:
+                    type: string
+                type: object
+              type: array
+          required:
+          - token
+          type: object
+        status:
+          description: ClusterStatus defines the observed state of Cluster
+          properties:
+            members:
+              items:
+                type: string
+              type: array
+            message:
+              type: string
+            status:
+              type: string
+          required:
+          - members
+          - message
+          - status
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.3.0
   creationTimestamp: null
   name: registers.node.harvesterci.io
 spec:
@@ -26,10 +141,14 @@ spec:
       description: Register is the Schema for the registers API
       properties:
         apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
-          description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object

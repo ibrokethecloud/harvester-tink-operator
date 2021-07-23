@@ -11,7 +11,7 @@ kind: Certificate
 metadata:
   name: root-ca
 spec:
-  commonName: tinkerbell
+  commonName: tinkerbell-ca
   isCA: true
   issuerRef:
     name: self-signed
@@ -31,6 +31,8 @@ metadata:
   name: server
 spec:
   commonName: tinkerbell
+  privateKey:
+    algorithm: RSA
   dnsNames:
     - tinkerbell.registry
     - tinkerbell.tinkerbell

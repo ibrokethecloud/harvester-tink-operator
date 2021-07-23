@@ -44,9 +44,9 @@ type ClusterSpec struct {
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	NodeStatus map[string]string
-	Status     string
-	Message    string
+	Members []string `json:"members"`
+	Status  string   `json:"status"`
+	Message string   `json:"message"`
 }
 
 // +kubebuilder:object:root=true

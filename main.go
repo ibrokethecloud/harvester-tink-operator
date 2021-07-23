@@ -35,6 +35,7 @@ import (
 	"github.com/ibrokethecloud/harvester-tink-operator/controllers"
 	"github.com/ibrokethecloud/harvester-tink-operator/pkg/http"
 	"github.com/ibrokethecloud/harvester-tink-operator/pkg/tink"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -45,7 +46,7 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
+	_ = apiextensions.AddToScheme(scheme)
 	_ = nodev1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
