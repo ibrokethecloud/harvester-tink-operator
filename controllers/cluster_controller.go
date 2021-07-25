@@ -29,7 +29,6 @@ import (
 	"github.com/ibrokethecloud/harvester-tink-operator/pkg/util"
 	"github.com/pkg/errors"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,7 +78,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// reconcile the cluster objects
 		var err error
 		newStatus := clusterReq.Status.DeepCopy()
-		log.Info("before switch")
 		switch newStatus.Status {
 		case "":
 			// filter and identify nodes
@@ -97,35 +95,13 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return r.ReconcileNodes(ctx, clusterReq)
 		}
 
-		controllerutil.AddFinalizer(clusterReq, regoFinalizer)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		clusterReq.Status = *newStatus
 		// always requeue since the exit is via the switch flow
 		return ctrl.Result{Requeue: true}, r.Update(ctx, clusterReq)
-	} else {
-		// Filter on all nodes with the cluster name label and prune them
-		if containsString(clusterReq.ObjectMeta.Finalizers, regoFinalizer) {
-			for _, node := range clusterReq.Status.Members {
-				delNode := &nodev1alpha1.Register{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: node,
-					},
-				}
-				err = r.Delete(ctx, delNode)
-				if err != nil {
-					return ctrl.Result{}, errors.Wrap(err, "error deleting register object")
-				}
-			}
-			controllerutil.RemoveFinalizer(clusterReq, regoFinalizer)
-			if err := r.Update(ctx, clusterReq); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-
 	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -169,9 +145,14 @@ func (r *ClusterReconciler) IdentifyNodes(ctx context.Context, req *nodev1alpha1
 	err = r.List(ctx, nodeList, &client.ListOptions{LabelSelector: nodeLabels})
 
 	if err != nil {
-		return status, errors.Wrap(err, "error fetching node list")
+		if apierror.IsNotFound(err) {
+			// request gets requeued until a node is available
+			return status, nil
+		} else {
+			return status, err
+		}
 	}
-	var memberList []string
+	memberList := []string{}
 	for _, node := range nodeList.Items {
 		if !containsString(status.Members, node.Name) {
 			memberList = append(memberList, node.Name)
@@ -179,6 +160,11 @@ func (r *ClusterReconciler) IdentifyNodes(ctx context.Context, req *nodev1alpha1
 	}
 	status.Members = memberList
 	status.Status = "ElectLeader"
+
+	if len(memberList) == 0 {
+		status.Status = "Nodesubmitted"
+	}
+
 	return status, nil
 }
 
@@ -219,7 +205,7 @@ func (r *ClusterReconciler) ElectLeader(ctx context.Context, req *nodev1alpha1.C
 		}
 	}
 
-	if !leaderExists {
+	if !leaderExists && len(possibleLeaderNodes) != 0 {
 		for _, node := range possibleLeaderNodes {
 			leaderNode = node
 		}
@@ -229,9 +215,11 @@ func (r *ClusterReconciler) ElectLeader(ctx context.Context, req *nodev1alpha1.C
 		leaderNode.SetLabels(leaderLabels)
 	}
 
-	err = r.Update(ctx, leaderNode)
-	if err != nil {
-		return status, err
+	if leaderNode != nil {
+		err = r.Update(ctx, leaderNode)
+		if err != nil {
+			return status, err
+		}
 	}
 
 	// in case we are unable to find a leader //
@@ -267,11 +255,17 @@ func (r *ClusterReconciler) PatchNodes(ctx context.Context, req *nodev1alpha1.Cl
 		registerReqLabels["ready"] = "true"
 		registerReq.SetLabels(registerReqLabels)
 
-		err = r.Update(ctx, registerReq)
-		if err != nil {
+		if err = controllerutil.SetControllerReference(req, registerReq, r.Scheme); err != nil {
 			return status, err
 		}
 
+		if err = controllerutil.SetOwnerReference(req, registerReq, r.Scheme); err != nil {
+			return status, err
+		}
+
+		if err = r.Update(ctx, registerReq); err != nil {
+			return status, err
+		}
 	}
 
 	status.Status = "NodeSubmitted"

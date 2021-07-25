@@ -84,7 +84,7 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	ready, readyOK := regoReq.Labels["ready"]
-	if !ok && readyOK && ready != "true" {
+	if !ok && !readyOK && ready != "true" {
 		return ctrl.Result{}, fmt.Errorf("Multi cluster mode. Waiting for node to be processed by cluster controller")
 	}
 
@@ -266,4 +266,20 @@ func (r *RegisterReconciler) doesNodeExist(ctx context.Context, regoReq *nodev1a
 	// assuming node has been found and there were no errors finding it
 	ok = true
 	return ok, nil
+}
+
+func (r *RegisterReconciler) fetchAndUpdateCluster(ctx context.Context, regoReq *nodev1alpha1.Register) (err error) {
+	clusterName, ok := regoReq.Labels["clusterName"]
+	if !ok {
+		// nothing to do
+		return nil
+	}
+	cluster := &nodev1alpha1.Cluster{}
+	err = r.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: regoReq.Namespace}, cluster)
+	if !apierror.IsNotFound(err) {
+		return errors.Wrap(err, "error looking up cluster object")
+	}
+
+	return r.Update(ctx, cluster)
+
 }
