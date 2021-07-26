@@ -92,7 +92,9 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			// Nodes have been submitted for processing
 			// During watch on node objects use this for identifying
 			// changes and resubmission of nodes
-			return r.ReconcileNodes(ctx, clusterReq)
+			r.Log.Info("processing cluster object")
+			result, err := r.ReconcileNodes(ctx, clusterReq)
+			return result, err
 		}
 
 		if err != nil {
@@ -112,11 +114,12 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&nodev1alpha1.Cluster{}).
 		Watches(&source.Kind{Type: &nodev1alpha1.Register{}},
 			&handler.EnqueueRequestsFromMapFunc{
-				ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-					var reconcileList []reconcile.Request
+				ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) (reconcileList []reconcile.Request) {
 					labels := a.Meta.GetLabels()
 					clusterName, ok := labels["clusterName"]
 					if ok {
+						r.Log.Info("Reconcilling registration request " + a.Meta.GetName())
+						r.Log.Info("Reconcilling cluster " + clusterName)
 						reconcileItem := reconcile.Request{
 							NamespacedName: types.NamespacedName{
 								Namespace: a.Meta.GetNamespace(),
@@ -125,6 +128,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						}
 						reconcileList = append(reconcileList, reconcileItem)
 					}
+					r.Log.Info("items returned: " + fmt.Sprintf("%d", len(reconcileList)))
 					return reconcileList
 				}),
 			}).
@@ -280,6 +284,7 @@ func (r *ClusterReconciler) getNode(ctx context.Context, req types.NamespacedNam
 }
 
 func (r *ClusterReconciler) ReconcileNodes(ctx context.Context, req *nodev1alpha1.Cluster) (result ctrl.Result, err error) {
+	r.Log.Info("Reconcilling cluster with additional nodes")
 	currentStatus := req.Status.DeepCopy()
 	newStatus, err := r.IdentifyNodes(ctx, req)
 	if err != nil {
@@ -311,9 +316,11 @@ func (r *ClusterReconciler) ReconcileNodes(ctx context.Context, req *nodev1alpha
 		currentStatus.Status = ""
 	}
 
+	r.Log.Info("Updating status in reconcileNodes" + currentStatus.Status)
 	if additionalNodes || missingNodes {
 		req.Status = *currentStatus
-		return result, r.Update(ctx, req)
+		err = r.Update(ctx, req)
+		return result, err
 	}
 
 	return result, nil

@@ -206,7 +206,7 @@ func (r *RegisterReconciler) generateHardware(ctx context.Context, regoReq *node
 
 	regoStatus = regoReq.Status.DeepCopy()
 
-	regoURL, err := util.FetchServerURL(r.Client, regoReq)
+	regoURL, err := util.FetchConfigEndpoint(r.Client)
 	if err != nil {
 		return regoStatus, errors.Wrap(err, "error fetching server url")
 	}

@@ -1,0 +1,15 @@
+---
+apiVersion: node.harvesterci.io/v1alpha1
+kind: Register
+metadata:
+  name: harvester-one-node-two
+  labels:
+    clusterName: "harvester-one"
+spec:
+  password: securePassword
+  token: randomtoken #in clustermode will be overriden by cluster level token
+  macAddress: "0c:c4:7a:6b:84:20"
+  interface: eth0
+  address: 172.16.128.7
+  netmask: 255.255.248.0
+  gateway: 172.16.128.1

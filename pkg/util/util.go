@@ -9,12 +9,14 @@ import (
 	"strings"
 
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/pkg/errors"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -135,4 +137,54 @@ func DoesSettingExist(client client.Client) (ok bool, err error) {
 		}
 	}
 	return ok, nil
+}
+
+func FetchConfigEndpoint(apiClient client.Client) (url string, err error) {
+	ok, err := DoesSettingExist(apiClient)
+	if err != nil {
+		return url, err
+	}
+
+	if ok {
+		serverURL := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "harvesterhci.io/v1beta1",
+				"kind":       "Setting",
+			},
+		}
+
+		err = apiClient.Get(context.TODO(), types.NamespacedName{Name: "server-url", Namespace: ""}, serverURL)
+
+		if err != nil {
+			return url, errors.Wrap(err, "error fetching server-url")
+		}
+
+		regoURL, ok := serverURL.Object["value"]
+		if !ok {
+			return url, fmt.Errorf("server-url value is not set")
+		}
+
+		urlArr := strings.Split(regoURL.(string), ":")
+
+		url = strings.Join(urlArr[:len(urlArr)-1], ":") + ":6443"
+
+		return url, nil
+	}
+
+	// running outside a harvester cluster, query harvester-tink-pod and find node from status //
+	nodeList := &v1.NodeList{}
+	err = apiClient.List(context.TODO(), nodeList)
+	if err != nil && !apierror.IsNotFound(err) {
+		return url, err
+	}
+
+	// we run as a node Port service just use the first node //
+	addressList := nodeList.Items[0].Status.Addresses
+	for _, address := range addressList {
+		if address.Type == "Hostname" {
+			url = "http://" + address.Address + ":30880"
+		}
+	}
+
+	return url, err
 }
