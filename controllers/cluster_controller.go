@@ -21,8 +21,9 @@ import (
 	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
 	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
@@ -37,18 +38,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	ElectLeader = "electleader"
+	PatchNodes  = "patchnodes"
+	Reconcilled = "reconcilled"
+)
+
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	SingleCluster bool
 }
 
 // +kubebuilder:rbac:groups=node.harvesterci.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=node.harvesterci.io,resources=clusters/status,verbs=get;update;patch
 
-func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("cluster", req.NamespacedName)
 
 	// your logic here
@@ -73,7 +80,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		log.Error(err, "unable to fetch cluster")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
+	log.Info("processing cluster object")
 	if clusterReq.ObjectMeta.DeletionTimestamp.IsZero() {
 		// reconcile the cluster objects
 		var err error
@@ -82,17 +89,16 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		case "":
 			// filter and identify nodes
 			newStatus, err = r.IdentifyNodes(ctx, clusterReq)
-		case "ElectLeader":
+		case ElectLeader:
 			// Identify a leader if one doesnt already exist
 			newStatus, err = r.ElectLeader(ctx, clusterReq)
-		case "PatchNodes":
+		case PatchNodes:
 			// Patch nodes with common settings and mark them ready for provisioning
 			newStatus, err = r.PatchNodes(ctx, clusterReq)
-		case "Nodesubmitted":
+		case NodeProcessed:
 			// Nodes have been submitted for processing
 			// During watch on node objects use this for identifying
 			// changes and resubmission of nodes
-			r.Log.Info("processing cluster object")
 			result, err := r.ReconcileNodes(ctx, clusterReq)
 			return result, err
 		}
@@ -113,25 +119,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nodev1alpha1.Cluster{}).
 		Watches(&source.Kind{Type: &nodev1alpha1.Register{}},
-			&handler.EnqueueRequestsFromMapFunc{
-				ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) (reconcileList []reconcile.Request) {
-					labels := a.Meta.GetLabels()
-					clusterName, ok := labels["clusterName"]
-					if ok {
-						r.Log.Info("Reconcilling registration request " + a.Meta.GetName())
-						r.Log.Info("Reconcilling cluster " + clusterName)
-						reconcileItem := reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: a.Meta.GetNamespace(),
-								Name:      clusterName,
-							},
-						}
-						reconcileList = append(reconcileList, reconcileItem)
-					}
-					r.Log.Info("items returned: " + fmt.Sprintf("%d", len(reconcileList)))
-					return reconcileList
-				}),
-			}).
+			handler.EnqueueRequestsFromMapFunc(r.reconcileObjects)).
 		Complete(r)
 }
 
@@ -163,10 +151,10 @@ func (r *ClusterReconciler) IdentifyNodes(ctx context.Context, req *nodev1alpha1
 		}
 	}
 	status.Members = memberList
-	status.Status = "ElectLeader"
+	status.Status = ElectLeader
 
 	if len(memberList) == 0 {
-		status.Status = "Nodesubmitted"
+		status.Status = NodeProcessed
 	}
 
 	return status, nil
@@ -230,7 +218,7 @@ func (r *ClusterReconciler) ElectLeader(ctx context.Context, req *nodev1alpha1.C
 	if !leaderExists {
 		return status, fmt.Errorf("Unable to elect a leader for the cluster %s. A cluster needs a leader with a static address and label leader=true", req.Name)
 	}
-	status.Status = "PatchNodes"
+	status.Status = PatchNodes
 	return status, nil
 }
 
@@ -272,7 +260,7 @@ func (r *ClusterReconciler) PatchNodes(ctx context.Context, req *nodev1alpha1.Cl
 		}
 	}
 
-	status.Status = "NodeSubmitted"
+	status.Status = NodeProcessed
 
 	return status, nil
 }
@@ -284,46 +272,49 @@ func (r *ClusterReconciler) getNode(ctx context.Context, req types.NamespacedNam
 }
 
 func (r *ClusterReconciler) ReconcileNodes(ctx context.Context, req *nodev1alpha1.Cluster) (result ctrl.Result, err error) {
-	r.Log.Info("Reconcilling cluster with additional nodes")
 	currentStatus := req.Status.DeepCopy()
-	newStatus, err := r.IdentifyNodes(ctx, req)
+	nodeList := &nodev1alpha1.RegisterList{}
+	nodeLabels, err := labels.Parse("clusterName=" + req.Name)
 	if err != nil {
 		return result, err
 	}
 
-	var additionalNodes bool
-	var missingNodes bool
-	var missingMembers []string
-	for _, node := range newStatus.Members {
-		if !containsString(currentStatus.Members, node) {
-			additionalNodes = true
+	err = r.List(ctx, nodeList, &client.ListOptions{LabelSelector: nodeLabels})
+
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			currentStatus.Members = []string{}
+		} else {
+			return result, err
 		}
 	}
 
-	for _, node := range currentStatus.Members {
-		if !containsString(newStatus.Members, node) {
-			missingNodes = true
-			// delete element from the list
-			missingMembers = append(missingMembers, node)
+	newMemberList := []string{}
+	var addedMember, removedMember bool
+	for _, node := range nodeList.Items {
+		newMemberList = append(newMemberList, node.Name)
+	}
+
+	for _, member := range newMemberList {
+		if !containsString(currentStatus.Members, member) {
+			addedMember = true
 		}
 	}
 
-	for _, member := range missingMembers {
-		currentStatus.Members = removeElement(currentStatus.Members, member)
+	for _, member := range currentStatus.Members {
+		if !containsString(newMemberList, member) {
+			removedMember = true
+		}
 	}
 
-	if additionalNodes {
+	if addedMember || removedMember {
 		currentStatus.Status = ""
-	}
-
-	r.Log.Info("Updating status in reconcileNodes" + currentStatus.Status)
-	if additionalNodes || missingNodes {
+		currentStatus.Members = []string{}
 		req.Status = *currentStatus
 		err = r.Update(ctx, req)
-		return result, err
 	}
 
-	return result, nil
+	return result, err
 }
 
 func removeElement(in []string, value string) (out []string) {
@@ -334,4 +325,20 @@ func removeElement(in []string, value string) (out []string) {
 	}
 
 	return out
+}
+
+func (r *ClusterReconciler) reconcileObjects(obj client.Object) (reconList []reconcile.Request) {
+	clusterLabels := obj.GetLabels()
+	clusterName, clusterOK := clusterLabels["clusterName"]
+	if clusterOK {
+		reconList = append(reconList, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      clusterName,
+				Namespace: obj.GetNamespace(),
+			},
+		})
+
+	}
+
+	return reconList
 }

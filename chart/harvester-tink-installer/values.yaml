@@ -11,7 +11,7 @@ tinkCertURL: "remote_tink_cert_url"
 tinkGrpcAuthURL: "remote_tink_grpc_auth_url"
 
 images:
-  harvesterTinkOperator: gmehta3/harvester-tink-operator:multi-1
+  harvesterTinkOperator: gmehta3/harvester-tink-operator:multi-3
   boots: gmehta3/boots:harvester2
   tinkCli: quay.io/tinkerbell/tink-cli:sha-1b178dae
   tinkServer: quay.io/tinkerbell/tink:sha-1b178dae

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -56,16 +55,16 @@ const (
 // RegisterReconciler reconciles a Register object
 type RegisterReconciler struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	FullClient *hw.FullClient
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	FullClient    *hw.FullClient
+	SingleCluster bool
 }
 
 // +kubebuilder:rbac:groups=node.harvesterci.io,resources=registers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=node.harvesterci.io,resources=registers/status,verbs=get;update;patch
 
-func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *RegisterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("register", req.NamespacedName)
 
 	regoReq := &nodev1alpha1.Register{}
@@ -78,59 +77,62 @@ func (r *RegisterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	ok, err := util.DoesSettingExist(r.Client)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	ready, readyOK := regoReq.Labels["ready"]
-	if !ok && !readyOK && ready != "true" {
-		return ctrl.Result{}, fmt.Errorf("Multi cluster mode. Waiting for node to be processed by cluster controller")
+	var ready string
+	if !r.SingleCluster {
+		ready, _ = regoReq.Labels["ready"]
+	} else {
+		ready = "true"
 	}
 
 	if regoReq.ObjectMeta.DeletionTimestamp.IsZero() {
-		// reconile object
-		var err error
-		newStatus := &nodev1alpha1.RegisterStatus{}
+		if ready == "true" {
+			// reconile object
+			var err error
+			newStatus := &nodev1alpha1.RegisterStatus{}
 
-		switch regoReq.Status.DeepCopy().Status {
-		case "":
-			// create uuid
-			newStatus, err = r.generateUID(regoReq)
-		case UIDGenerated:
-			// make hardware call
-			newStatus, err = r.generateHardware(ctx, regoReq)
-		case HWPushed:
-			_, ok := regoReq.Labels["nodeReady"]
-			if ok {
-				return ctrl.Result{}, nil
-			} else {
-				// check if node exists already in which case its time to label
-				ok, err := r.doesNodeExist(ctx, regoReq)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-
-				if !ok {
-					// node doest exist yet. Ignore and wait for watcher to requeue
+			switch regoReq.Status.DeepCopy().Status {
+			case "":
+				// create uuid
+				newStatus, err = r.generateUID(regoReq)
+			case UIDGenerated:
+				// make hardware call
+				newStatus, err = r.generateHardware(ctx, regoReq)
+			case HWPushed:
+				_, ok := regoReq.Labels["nodeReady"]
+				if ok {
 					return ctrl.Result{}, nil
 				} else {
-					regoReq.Labels["nodeReady"] = "true"
-					newStatus = regoReq.Status.DeepCopy()
-					newStatus.Status = NodeProcessed
+					// check if node exists already in which case its time to label
+					ok, err := r.doesNodeExist(ctx, regoReq)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
+
+					if !ok {
+						// node doest exist yet. Ignore and wait for watcher to requeue
+						return ctrl.Result{}, nil
+					} else {
+						regoReq.Labels["nodeReady"] = "true"
+						newStatus = regoReq.Status.DeepCopy()
+						newStatus.Status = NodeProcessed
+					}
 				}
+			case NodeProcessed:
+				return ctrl.Result{}, nil
 			}
-		case NodeProcessed:
-			return ctrl.Result{}, nil
+
+			regoReq.Status = *newStatus
+			controllerutil.AddFinalizer(regoReq, regoFinalizer)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			// always requeue since we want it to exit reconile loop via the switch flow //
+			return ctrl.Result{Requeue: true}, r.Update(ctx, regoReq)
+		} else {
+			r.Log.Info("Running in multi cluster mode. Waiting for labels to be set. Ignoring result till then.")
+			return ctrl.Result{Requeue: false}, nil
 		}
 
-		regoReq.Status = *newStatus
-		controllerutil.AddFinalizer(regoReq, regoFinalizer)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		// always requeue since we want it to exit reconile loop via the switch flow //
-		return ctrl.Result{Requeue: true}, r.Update(ctx, regoReq)
 	} else {
 		if containsString(regoReq.ObjectMeta.Finalizers, regoFinalizer) {
 			if len(regoReq.Status.UUID) != 0 {
@@ -154,18 +156,16 @@ func (r *RegisterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nodev1alpha1.Register{}).
 		Watches(&source.Kind{Type: &v1.Node{}},
-			&handler.EnqueueRequestsFromMapFunc{
-				ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-					return []reconcile.Request{
-						{
-							NamespacedName: types.NamespacedName{
-								Name:      a.Meta.GetName(),
-								Namespace: a.Meta.GetNamespace(),
-							},
+			handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name:      a.GetName(),
+							Namespace: a.GetNamespace(),
 						},
-					}
-				}),
-			}).
+					},
+				}
+			})).
 		Complete(r)
 }
 

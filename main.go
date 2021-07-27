@@ -21,6 +21,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/ibrokethecloud/harvester-tink-operator/pkg/util"
+
 	web "net/http"
 
 	"github.com/gorilla/mux"
@@ -90,11 +92,17 @@ func main() {
 
 	client := mgr.GetClient()
 
+	ok, err := util.DoesSettingExist(client)
+	if err != nil {
+		setupLog.Error(err, "unable to query crds")
+	}
+
 	if err = (&controllers.RegisterReconciler{
-		Client:     client,
-		Log:        ctrl.Log.WithName("controllers").WithName("Register"),
-		Scheme:     mgr.GetScheme(),
-		FullClient: fullClient,
+		Client:        client,
+		Log:           ctrl.Log.WithName("controllers").WithName("Register"),
+		Scheme:        mgr.GetScheme(),
+		FullClient:    fullClient,
+		SingleCluster: ok,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Register")
 		os.Exit(1)
@@ -123,9 +131,10 @@ func main() {
 		_ = webServer.Shutdown(context.Background())
 	}()
 	if err = (&controllers.ClusterReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Cluster"),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme:        mgr.GetScheme(),
+		SingleCluster: ok,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
