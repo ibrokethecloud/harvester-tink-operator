@@ -179,12 +179,14 @@ func FetchConfigEndpoint(apiClient client.Client) (url string, err error) {
 	}
 
 	// we run as a node Port service just use the first node //
+	preferredAddressTypes := []v1.NodeAddressType{v1.NodeExternalIP, v1.NodeInternalIP, v1.NodeHostName}
 	addressList := nodeList.Items[0].Status.Addresses
-	for _, address := range addressList {
-		if address.Type == "Hostname" {
-			url = "http://" + address.Address + ":30880"
+	for _, addressType := range preferredAddressTypes {
+		for _, address := range addressList {
+			if address.Type == addressType {
+				return "http://" + address.Address + ":30880", nil
+			}
 		}
 	}
-
-	return url, err
+	return "", fmt.Errorf("Could not match endpoint address type")
 }
