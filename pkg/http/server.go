@@ -3,6 +3,8 @@ package http
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"path"
 
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -132,12 +134,15 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 		Mode:          mode,
 		MgmtInterface: node.Spec.Interface,
 		Device:        disk,
-		ISOURL:        v1alpha1.DefaultISOURL,
 	}
 
-	if len(node.Spec.PXEIsoURL) != 0 {
-		install.ISOURL = node.Spec.PXEIsoURL
+	isoURL, err := generateISOURL(node)
+	if err != nil {
+		util.ReturnHTTPMessage(w, r, 500, "error", "error during isoURL generation")
+		return
 	}
+
+	install.ISOURL = isoURL
 
 	config := installer.HarvesterConfig{
 		Token:   node.Spec.Token,
@@ -157,4 +162,26 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.ReturnHTTPRaw(w, r, string(contentByte))
+}
+
+func generateISOURL(node v1alpha1.Register) (isoURL string, err error) {
+	imagePath := v1alpha1.DefaultISOURL
+	if len(node.Spec.PXEIsoURL) != 0 {
+		imagePath = node.Spec.PXEIsoURL
+	}
+
+	imageName := v1alpha1.DefaultISOName
+	if len(node.Spec.IsoName) != 0 {
+		imageName = node.Spec.IsoName
+	}
+
+	base, err := url.Parse(imagePath)
+	if err != nil {
+		return isoURL, err
+	}
+
+	base.Path = path.Join(base.Path, imageName)
+	isoURL = base.String()
+	return isoURL, nil
+
 }

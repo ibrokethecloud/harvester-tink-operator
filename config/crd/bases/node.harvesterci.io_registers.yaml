@@ -58,6 +58,8 @@ spec:
               type: string
             interface:
               type: string
+            isoName:
+              type: string
             macAddress:
               type: string
             modules:
