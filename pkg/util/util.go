@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	nodev1alpha1 "github.com/ibrokethecloud/harvester-tink-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"net/http"
+	"os"
 	"strconv"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,24 +63,34 @@ func ReturnHTTPRaw(w http.ResponseWriter, r *http.Request, content string) {
 
 // helper to find registration url //
 func FetchServerURL(client client.Client) (url string, err error) {
-	serverURL := &unstructured.Unstructured{
+	namespace := os.Getenv("namespace")
+	service := &corev1.Service{}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "harvester-tink-operator", Namespace: namespace}, service)
+	if err != nil {
+		return url, err
+	}
+
+	address := os.Getenv("PUBLIC_IP")
+
+	url = fmt.Sprintf("http://%s:%s", address, nodev1alpha1.DefaultConfigURLPort)
+
+	return url, nil
+}
+
+// helper to find harvester version
+func FindHarvesterVersion(client client.Client) (version string, err error) {
+	versionObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "harvesterhci.io/v1beta1",
 			"kind":       "Setting",
 		},
 	}
 
-	err = client.Get(context.TODO(), types.NamespacedName{Name: "server-url", Namespace: ""}, serverURL)
-
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "server-version", Namespace: ""}, versionObj)
 	if err != nil {
-		return url, errors.Wrap(err, "error fetching server-url")
+		return version, err
 	}
 
-	regoURL, ok := serverURL.Object["value"]
-	if !ok {
-		return url, fmt.Errorf("server-url value is not set")
-	}
-
-	url = regoURL.(string)
-	return url, nil
+	version = versionObj.Object["value"].(string)
+	return version, err
 }

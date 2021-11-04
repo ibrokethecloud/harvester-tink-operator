@@ -25,8 +25,8 @@ tinkCertURL: "remote_tink_cert_url"
 tinkGrpcAuthURL: "remote_tink_grpc_auth_url"
 
 images:
-  harvesterTinkOperator: gmehta3/harvester-tink-operator:dev
-  boots: gmehta3/boots:harvester2
+  harvesterTinkOperator: gmehta3/harvester-tink-operator:harvester3
+  boots: gmehta3/boots:harvester3
   tinkCli: quay.io/tinkerbell/tink-cli:sha-1b178dae
   tinkServer: quay.io/tinkerbell/tink:sha-1b178dae
   tinkServerInit: busybox:latest
@@ -48,8 +48,22 @@ spec:
   address: 172.16.128.11
   netmask: 255.255.248.0
   gateway: 172.16.128.1
+  pxeIsoURL: http://172.16.135.50:8080/harvester-v0.3.0-amd64.iso #Optional. If not specified operator will use the appropriate iso version eg.. https://releases.rancher.com/harvester/v0.3.0/harvester-v0.3.0-amd64.iso
+  imageURL: http://172.16.135.50:8080 #Optional argument to specify where to find kernel, initrd  and rootfs images. 
 ```
 
 
 The operator will create the correct hardware object in tink and now the user can reboot said nodes to trigger the pxe based installation.
+
+**NOTE for airgapped environments**
+
+If imageURL is specified, then please ensure that the correct version folder with artifact names exists.
+
+For example if imageURL is http://172.16.135.50:8080, then harvester boots image will look for artifacts at the following location
+
+```
+initrd: http://172.16.135.50:8080/v0.3.0/harvester-v0.3.0-initrd-amd64
+kernel: http://172.16.135.50:8080/v0.3.0/harvester-v0.3.0-vmlinuz-amd64
+rootfs: http://172.16.135.50:8080/v0.3.0/harvester-v0.3.0-rootfs-amd64.squashfs
+```
 

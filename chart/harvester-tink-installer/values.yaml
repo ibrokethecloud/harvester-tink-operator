@@ -11,10 +11,9 @@ tinkCertURL: "remote_tink_cert_url"
 tinkGrpcAuthURL: "remote_tink_grpc_auth_url"
 
 images:
-  harvesterTinkOperator: gmehta3/harvester-tink-operator:dev
-  boots: gmehta3/boots:harvester2
+  harvesterTinkOperator: gmehta3/harvester-tink-operator:harvester3
+  boots: gmehta3/boots:harvester3
   tinkCli: quay.io/tinkerbell/tink-cli:sha-1b178dae
   tinkServer: quay.io/tinkerbell/tink:sha-1b178dae
   tinkServerInit: busybox:latest
   db: docker.io/postgres:10-alpine
-

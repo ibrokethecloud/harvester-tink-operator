@@ -1,15 +1,40 @@
 package installer
 
+import (
+	"fmt"
+	"github.com/imdario/mergo"
+)
+
 // Copy of HarvesterInstall config https://github.com/harvester/harvester-installer/pkg/config
 // to avoid dep hell
 
+const (
+	SanitizeMask = "***"
+)
+
+type NetworkInterface struct {
+	Name   string `json:"name,omitempty"`
+	HwAddr string `json:"hwAddr,omitempty"`
+}
+
+const (
+	BondModeBalanceRR    = "balance-rr"
+	BondModeActiveBackup = "active-backup"
+	BondModeBalnaceXOR   = "balance-xor"
+	BondModeBroadcast    = "broadcast"
+	BondModeIEEE802_3ad  = "802.3ad"
+	BondModeBalanceTLB   = "balance-tlb"
+	BondModeBalanceALB   = "balance-alb"
+)
+
 type Network struct {
-	Interface      string   `json:"interface,omitempty"`
-	Method         string   `json:"method,omitempty"`
-	IP             string   `json:"ip,omitempty"`
-	SubnetMask     string   `json:"subnetMask,omitempty"`
-	Gateway        string   `json:"gateway,omitempty"`
-	DNSNameservers []string `json:"dnsNameservers,omitempty"`
+	Interfaces   []NetworkInterface `json:"interfaces,omitempty"`
+	Method       string             `json:"method,omitempty"`
+	IP           string             `json:"ip,omitempty"`
+	SubnetMask   string             `json:"subnetMask,omitempty"`
+	Gateway      string             `json:"gateway,omitempty"`
+	DefaultRoute bool               `json:"defaultRoute,omitempty"`
+	BondOptions  map[string]string  `json:"bondOptions,omitempty"`
 }
 
 type HTTPBasicAuth struct {
@@ -28,10 +53,13 @@ type Webhook struct {
 }
 
 type Install struct {
-	Automatic     bool      `json:"automatic,omitempty"`
-	Mode          string    `json:"mode,omitempty"`
-	MgmtInterface string    `json:"mgmtInterface,omitempty"`
-	Networks      []Network `json:"networks,omitempty"`
+	Automatic bool               `json:"automatic,omitempty"`
+	Mode      string             `json:"mode,omitempty"`
+	Networks  map[string]Network `json:"networks,omitempty"`
+
+	Vip       string `json:"vip,omitempty"`
+	VipHwAddr string `json:"vipHwAddr,omitempty"`
+	VipMode   string `json:"vipMode,omitempty"`
 
 	ForceEFI  bool   `json:"forceEfi,omitempty"`
 	Device    string `json:"device,omitempty"`
@@ -42,6 +70,7 @@ type Install struct {
 	NoFormat  bool   `json:"noFormat,omitempty"`
 	Debug     bool   `json:"debug,omitempty"`
 	TTY       string `json:"tty,omitempty"`
+	ForceGPT  bool   `json:"forceGpt,omitempty"`
 
 	Webhooks []Webhook `json:"webhooks,omitempty"`
 }
@@ -51,8 +80,17 @@ type Wifi struct {
 	Passphrase string `json:"passphrase,omitempty"`
 }
 
+type File struct {
+	Encoding           string `json:"encoding"`
+	Content            string `json:"content"`
+	Owner              string `json:"owner"`
+	Path               string `json:"path"`
+	RawFilePermissions string `json:"permissions"`
+}
+
 type OS struct {
 	SSHAuthorizedKeys []string `json:"sshAuthorizedKeys,omitempty"`
+	WriteFiles        []File   `json:"writeFiles,omitempty"`
 	Hostname          string   `json:"hostname,omitempty"`
 
 	Modules        []string          `json:"modules,omitempty"`
@@ -68,6 +106,44 @@ type HarvesterConfig struct {
 	ServerURL string `json:"serverUrl,omitempty"`
 	Token     string `json:"token,omitempty"`
 
-	OS      `json:"os,omitempty"`
-	Install `json:"install,omitempty"`
+	OS             `json:"os,omitempty"`
+	Install        `json:"install,omitempty"`
+	RuntimeVersion string `json:"runtimeVersion,omitempty"`
+}
+
+func NewHarvesterConfig() *HarvesterConfig {
+	return &HarvesterConfig{}
+}
+
+func (c *HarvesterConfig) DeepCopy() (*HarvesterConfig, error) {
+	newConf := NewHarvesterConfig()
+	if err := mergo.Merge(newConf, c, mergo.WithAppendSlice); err != nil {
+		return nil, fmt.Errorf("fail to create copy of %T at %p: %s", *c, c, err.Error())
+	}
+	return newConf, nil
+}
+
+func (c *HarvesterConfig) sanitized() (*HarvesterConfig, error) {
+	copied, err := c.DeepCopy()
+	if err != nil {
+		return nil, err
+	}
+	if copied.Password != "" {
+		copied.Password = SanitizeMask
+	}
+	if copied.Token != "" {
+		copied.Token = SanitizeMask
+	}
+	for i := range copied.Wifi {
+		copied.Wifi[i].Passphrase = SanitizeMask
+	}
+	return copied, nil
+}
+
+func (c *HarvesterConfig) String() string {
+	s, err := c.sanitized()
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("%+v", *s)
 }

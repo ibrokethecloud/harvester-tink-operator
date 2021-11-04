@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -98,44 +99,57 @@ func (c *ConfigServer) getConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	network := installer.Network{
-		Interface: node.Spec.Interface,
+		Interfaces: []installer.NetworkInterface{
+			installer.NetworkInterface{
+				Name:   node.Spec.Interface,
+				HwAddr: node.Spec.MacAddress,
+			},
+		},
 	}
 
-	if len(node.Spec.Address) != 0 && len(node.Spec.Netmask) != 0 && len(node.Spec.Gateway) != 0 {
+	/*if len(node.Spec.Address) != 0 && len(node.Spec.Netmask) != 0 && len(node.Spec.Gateway) != 0 {
 		network.IP = node.Spec.Address
 		network.SubnetMask = node.Spec.Netmask
 		network.Gateway = node.Spec.Gateway
-	}
+	} */
+	network.DefaultRoute = true
+	network.Method = "dhcp"
 
 	if len(node.Spec.NTPServers) != 0 {
 		os.NTPServers = node.Spec.NTPServers
 	}
 
 	if len(node.Spec.DNSNameservers) != 0 {
-		network.DNSNameservers = node.Spec.DNSNameservers
+		os.DNSNameservers = node.Spec.DNSNameservers
 	}
 
 	disk := "/dev/sda"
 	if len(node.Spec.Disk) != 0 {
 		disk = node.Spec.Disk
 	}
+	harvesterManagementNetwork := make(map[string]installer.Network)
+	harvesterManagementNetwork["harvester-mgmt"] = network
 	install := installer.Install{
-		Networks: []installer.Network{
-			network,
-		},
-		Automatic:     true,
-		Mode:          "join",
-		MgmtInterface: node.Spec.Interface,
-		Device:        disk,
-		ISOURL:        v1alpha1.DefaultISOURL,
+		Networks:  harvesterManagementNetwork,
+		Automatic: true,
+		Mode:      "join",
+		Device:    disk,
+	}
+
+	version, err := util.FindHarvesterVersion(c.Client)
+	if err != nil {
+		util.ReturnHTTPMessage(w, r, 500, "error", "harvester version fetch error")
+		return
 	}
 
 	if len(node.Spec.PXEIsoURL) != 0 {
 		install.ISOURL = node.Spec.PXEIsoURL
+	} else {
+		install.ISOURL = fmt.Sprintf("https://releases.rancher.com/harvester/%s/harvester-%s-amd64.iso", version, version)
 	}
 
 	config := installer.HarvesterConfig{
-		ServerURL: strings.Join(serverURLArr[:len(serverURLArr)-1], ":") + ":6443",
+		ServerURL: strings.Join(append([]string{"https"}, serverURLArr[1:len(serverURLArr)-1]...), ":") + ":8443",
 		Token:     node.Spec.Token,
 		OS:        os,
 		Install:   install,

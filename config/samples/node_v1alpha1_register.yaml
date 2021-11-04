@@ -5,7 +5,9 @@ metadata:
 spec:
   macAddress: "0c:c4:7a:6b:80:d0"
   token: token
-  interface: eth0
-  address: 172.16.128.11
+  interface: enp0s20f0
+  address: 172.16.128.7
   netmask: 255.255.248.0
   gateway: 172.16.128.1
+  pxeIsoURL: http://172.16.135.50:8080/harvester-v0.3.0-amd64.iso
+  imageURL: http://172.16.135.50:8080/

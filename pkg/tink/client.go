@@ -58,8 +58,8 @@ func GenerateHWRequest(regoReq *nodev1alpha1.Register, serverURL string) (hw *ha
 	}
 
 	// Specify non default location to load ISO's
-	if len(regoReq.Spec.PXEIsoURL) != 0 {
-		networkInterfaces.Netboot.Osie = &hardware.Hardware_Netboot_Osie{BaseUrl: regoReq.Spec.PXEIsoURL}
+	if len(regoReq.Spec.ImageURL) != 0 {
+		networkInterfaces.Netboot.Osie = &hardware.Hardware_Netboot_Osie{BaseUrl: regoReq.Spec.ImageURL}
 	}
 
 	ip := &hardware.Hardware_DHCP_IP{}
@@ -110,12 +110,16 @@ func generateMetaData(regoReq *nodev1alpha1.Register, serverURL string) (metadat
 		ServerUrl   string
 		DefaultPort string
 		UUID        string
+		Slug        string
+		Interface   string
 	}
 	var output bytes.Buffer
 	tmpStruct.ServerUrl = serverURL
 	tmpStruct.DefaultPort = nodev1alpha1.DefaultConfigURLPort
 	tmpStruct.UUID = regoReq.Status.UUID
-	var metaDataStruct = `{"facility":{"facility_code":"onprem"},"instance":{"userdata":"harvester.install.config_url=http://{{ .ServerUrl }}:{{ .DefaultPort }}/config/{{ .UUID }}" ,"operating_system":{"slug":"harvester_0_2_0"}}}`
+	tmpStruct.Slug = nodev1alpha1.DefaultSlug
+	tmpStruct.Interface = regoReq.Spec.Interface
+	var metaDataStruct = `{"facility":{"facility_code":"onprem"},"instance":{"userdata":"ip={{ .Interface }}:dhcp harvester.install.config_url=http://{{ .ServerUrl }}:{{ .DefaultPort }}/config/{{ .UUID }}" ,"operating_system":{"slug":"{{ .Slug }}"}}}`
 
 	metadataTmpl := template.Must(template.New("MetData").Parse(metaDataStruct))
 
