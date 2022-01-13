@@ -21,6 +21,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	DefaultSlug = "harvester_0_3_0"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -34,6 +38,7 @@ type RegisterSpec struct {
 	Netmask           string            `json:"netmask,omitempty"`
 	Gateway           string            `json:"gateway,omitempty"`
 	PXEIsoURL         string            `json:"pxeIsoURL,omitempty"`
+	ImageURL          string            `json:"imageURL,omitempty"`
 	SSHAuthorizedKeys []string          `json:"sshAuthorizedKeys,omitempty"`
 	Modules           []string          `json:"modules,omitempty"`
 	Sysctls           map[string]string `json:"sysctls,omitempty"`

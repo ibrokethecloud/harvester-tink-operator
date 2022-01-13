@@ -46,7 +46,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-          image: gmehta3/boots:harvester2
+          image: {{ .Values.images.boots }}
           imagePullPolicy: Always
           name: boots
           ports:
