@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	DefaultSlug = "harvester_0_3_0"
+	DefaultSlug = "harvester_1_0_0"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -30,24 +30,26 @@ const (
 
 // RegisterSpec defines the desired state of Register
 type RegisterSpec struct {
-	MacAddress        string            `json:"macAddress"`
-	Token             string            `json:"token"`
-	Nameservers       []string          `json:"nameServers,omitempty"`
-	Interface         string            `json:"interface"`
-	Address           string            `json:"address,omitempty"`
-	Netmask           string            `json:"netmask,omitempty"`
-	Gateway           string            `json:"gateway,omitempty"`
-	PXEIsoURL         string            `json:"pxeIsoURL,omitempty"`
-	ImageURL          string            `json:"imageURL,omitempty"`
-	SSHAuthorizedKeys []string          `json:"sshAuthorizedKeys,omitempty"`
-	Modules           []string          `json:"modules,omitempty"`
-	Sysctls           map[string]string `json:"sysctls,omitempty"`
-	NTPServers        []string          `json:"ntpServers,omitempty"`
-	DNSNameservers    []string          `json:"dnsNameservers,omitempty"`
-	Wifi              []installer.Wifi  `json:"wifi,omitempty"`
-	Password          string            `json:"password,omitempty"`
-	Environment       map[string]string `json:"environment,omitempty"`
-	Disk              string            `json:"disk,omitempty"`
+	MacAddress          string            `json:"macAddress"`
+	Token               string            `json:"token"`
+	Nameservers         []string          `json:"nameServers,omitempty"`
+	Interface           string            `json:"interface,omitempty"`
+	Address             string            `json:"address,omitempty"`
+	Netmask             string            `json:"netmask,omitempty"`
+	Gateway             string            `json:"gateway,omitempty"`
+	PXEIsoURL           string            `json:"pxeIsoURL,omitempty"`
+	ImageURL            string            `json:"imageURL,omitempty"`
+	SSHAuthorizedKeys   []string          `json:"sshAuthorizedKeys,omitempty"`
+	Modules             []string          `json:"modules,omitempty"`
+	Sysctls             map[string]string `json:"sysctls,omitempty"`
+	NTPServers          []string          `json:"ntpServers,omitempty"`
+	DNSNameservers      []string          `json:"dnsNameservers,omitempty"`
+	Wifi                []installer.Wifi  `json:"wifi,omitempty"`
+	Password            string            `json:"password,omitempty"`
+	Environment         map[string]string `json:"environment,omitempty"`
+	Disk                string            `json:"disk,omitempty"`
+	Slug                string            `json:"slug,omitempty"`
+	KernelBootArguments string            `json:"kernelBootArguments,omitempty"`
 }
 
 // RegisterStatus defines the observed state of Register

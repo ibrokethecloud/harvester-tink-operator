@@ -37,7 +37,7 @@ spec:
             - name: FACILITY_CODE
               value: "onprem"
             - name: HTTP_BIND
-              value: 0.0.0.0:80
+              value: 0.0.0.0:8080
             - name: SYSLOG_BIND
               value: 0.0.0.0:514
             - name: TFTP_BIND
@@ -46,6 +46,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
+            - name: PUBLIC_FQDN
+              value: "$(PUBLIC_IP):8080"
           image: {{ .Values.images.boots }}
           imagePullPolicy: Always
           name: boots
@@ -54,7 +56,7 @@ spec:
               name: dhcp
             - containerPort: 69
               name: tftp
-            - containerPort: 80
+            - containerPort: 8080
               name: http
       restartPolicy: Always
 ---

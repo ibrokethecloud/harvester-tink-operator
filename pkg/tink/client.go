@@ -107,19 +107,26 @@ func GenerateHWRequest(regoReq *nodev1alpha1.Register, serverURL string) (hw *ha
 func generateMetaData(regoReq *nodev1alpha1.Register, serverURL string) (metadata string, err error) {
 
 	var tmpStruct struct {
-		ServerUrl   string
-		DefaultPort string
-		UUID        string
-		Slug        string
-		Interface   string
+		ServerUrl     string
+		DefaultPort   string
+		UUID          string
+		Slug          string
+		Interface     string
+		BootArguments string
 	}
 	var output bytes.Buffer
 	tmpStruct.ServerUrl = serverURL
 	tmpStruct.DefaultPort = nodev1alpha1.DefaultConfigURLPort
 	tmpStruct.UUID = regoReq.Status.UUID
-	tmpStruct.Slug = nodev1alpha1.DefaultSlug
+	if regoReq.Spec.Slug != "" {
+		tmpStruct.Slug = regoReq.Spec.Slug
+	} else {
+		tmpStruct.Slug = nodev1alpha1.DefaultSlug
+	}
+
 	tmpStruct.Interface = regoReq.Spec.Interface
-	var metaDataStruct = `{"facility":{"facility_code":"onprem"},"instance":{"userdata":"ip={{ .Interface }}:dhcp harvester.install.config_url=http://{{ .ServerUrl }}:{{ .DefaultPort }}/config/{{ .UUID }}" ,"operating_system":{"slug":"{{ .Slug }}"}}}`
+	tmpStruct.BootArguments = regoReq.Spec.KernelBootArguments
+	var metaDataStruct = `{"facility":{"facility_code":"onprem"},"instance":{"userdata":"harvester.install.config_url=http://{{ .ServerUrl }}:{{ .DefaultPort }}/config/{{ .UUID }} {{ .BootArguments }}" ,"operating_system":{"slug":"{{ .Slug }}"}}}`
 
 	metadataTmpl := template.Must(template.New("MetData").Parse(metaDataStruct))
 
